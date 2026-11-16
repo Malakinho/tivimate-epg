@@ -40,10 +40,10 @@ SOURCES = [
 # These are design hints only. Do not infer the actual licence for TV metadata.
 MAX_DOWNLOAD = 180 * 1024 * 1024
 BAD_IDS = {"", "TS", "N/A", "NONE", "NULL", "0", "-"}
-PREFIX = re.compile(r"^(?:DE GO|DE|GR|PRIME|JOYN|WOW|SKYGO)\s*:\s*", re.I)
+PREFIX = re.compile(r"^(?:DE GO|DE|GR|PRIME|JOYN|WOW|SKYGO)\s*[:\-]\s*", re.I)
 QUALITY = re.compile(
     r"\b(?:RAW|HEVC|H265|H264|SD|FHD|HD|UHD|4K|8K|720P|1080P|2160P|"
-    r"50FPS|60FPS|30FPS|WEB|MOBILE|MOBIL|SAT|KABEL|BACKUP|BK|LOW|HIGH|"
+    r"50FPS|60FPS|30FPS|3840P|EON|WEB|MOBILE|MOBIL|SAT|KABEL|BACKUP|BK|LOW|HIGH|"
     r"BITRATE|STREAM|DOLBY|HDR)\b", re.I
 )
 
@@ -62,6 +62,14 @@ def clean_name(value: str) -> str:
     value = re.sub(r"\bANT\s+1\b", "ANT1", value)
     value = re.sub(r"\b3\s+SAT\b", "3SAT", value)
     value = re.sub(r"\bSKY\s+SPORT\s+BUNDESLIGA\b", "SKY BUNDESLIGA", value)
+    # Same Greek sports channel under differently formatted source names.
+    value = re.sub(r"\bMAGENTA SPORT LEAGUE ([1-4])\b", r"MAGENTA SPORT \1 LEAGUE", value)
+    value = re.sub(r"\bNOVA\s*SPORTS?\b", "NOVASPORTS", value)
+    value = re.sub(
+        r"\bNOVASPORTS(START|NEWS|PRIME|EXTRA|PREMIERLEAGUE)\b",
+        lambda m: "NOVASPORTS " + m.group(1), value
+    )
+    value = value.replace("NOVASPORTS PREMIERE LEAGUE", "NOVASPORTS PREMIER LEAGUE")
     return value
 
 
