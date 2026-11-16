@@ -31,6 +31,8 @@ OUT_DIR = ROOT / "site"
 SOURCES = [
     ("DE-EPG", "DE", "https://iptv-epg.org/files/epg-de.xml"),
     ("GR-EPG", "GR", "https://iptv-epg.org/files/epg-gr.xml"),
+    ("GR-GREEKTV", "GR", "https://ext.greektv.app/epg/epg.xml.gz"),
+    ("GR-COSMOTE", "GR", "https://iptv-org.github.io/epg/guides/el/cosmote.gr.xml"),
     ("DE-MASTER", "DE", "https://kaimandura.github.io/epg-de/DE-MASTER.xml.gz"),
 ]
 # These are design hints only. Do not infer the actual licence for TV metadata.
@@ -205,6 +207,11 @@ def build() -> dict:
             for n in ch.norm_names:
                 by_name[n].append(ch)
 
+        for feed_channels in per_feed:
+            matches = [(ch.id, ch.names[:2], ch.programmes) for ch in feed_channels.values()
+                       if any("COSMOTE SPORT" in clean_name(n) or "MAGENTA SPORT" in clean_name(n) for n in ch.names)]
+            if matches:
+                logging.info("SPORT-PROBE %s: %s examples=%s", feeds[next(iter(feed_channels.values())).feed].label, len(matches), matches[:28])
         aliases: dict[str, Channel] = {}
         display_aliases: dict[str, set[str]] = defaultdict(set)
         candidate_ids: defaultdict[str, set[str]] = defaultdict(set)
@@ -218,6 +225,19 @@ def build() -> dict:
             market = market_of(label)
             direct = by_id.get(user_id.casefold()) if id_valid(user_id) else None
             named = best(by_name.get(normalized, []), market, feeds, user_id)
+            if not named and market == "GR" and normalized.startswith("MAGENTA SPORT"):
+                # Greek COSMOTE Sport was rebranded as Magenta Sport.
+                old_brand = normalized.replace("MAGENTA SPORT", "COSMOTE SPORT", 1)
+                alternate = [old_brand]
+                league_match = re.fullmatch(r"MAGENTA SPORT LEAGUE ([1-4])", normalized)
+                if league_match:
+                    alternate.extend(("COSMOTE SPORT " + league_match.group(1) + " LEAGUE",
+                                      "COSMOTE SPORT " + league_match.group(1) + " L"))
+                for old_name in alternate:
+                    named = best([c for c in by_name.get(old_name, []) if feeds[c.feed].market == "GR"], market, feeds, user_id)
+                    if named:
+                        metrics["greek_magenta_rebrand_match"] += 1
+                        break
             chosen = None
             if named:
                 chosen = named
