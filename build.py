@@ -28,6 +28,7 @@ from xml.etree import ElementTree as ET
 ROOT = Path(__file__).resolve().parent
 DATA = ROOT / "data" / "channels.csv"
 PPV_DATA = ROOT / "data" / "ppv.csv"
+ALWAYS_ON_DATA = ROOT / "data" / "always_on.csv"
 OUT_DIR = ROOT / "site"
 SOURCES = [
     ("DE-EPG", "DE", "https://iptv-epg.org/files/epg-de.xml"),
@@ -179,6 +180,11 @@ def build() -> dict:
         input_rows = list(csv.DictReader(csvfile))
     with PPV_DATA.open("r", encoding="utf-8-sig", newline="") as csvfile:
         ppv_rows = list(csv.DictReader(csvfile))
+    # PPV placeholders remain unchanged. 24/7 entries are only added
+    # where the provider supplied no EPG ID.
+    with ALWAYS_ON_DATA.open("r", encoding="utf-8-sig", newline="") as csvfile:
+        always_on_rows = list(csv.DictReader(csvfile))
+    placeholder_rows = ppv_rows + always_on_rows
     with tempfile.TemporaryDirectory() as temp:
         temp_dir = Path(temp)
         feeds: list[Feed] = []
@@ -320,7 +326,7 @@ def build() -> dict:
                     zipout.write(b"\n")
                 # PPV placeholder channels: full provider name as EPG title.
                 # Never imply that these are real broadcast event times.
-                for item in ppv_rows:
+                for item in placeholder_rows:
                     cid = item["id"]
                     title = item["name"]
                     if not cid or not title:
@@ -356,7 +362,7 @@ def build() -> dict:
                                 root.clear()
                 from datetime import timedelta
                 today = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
-                for item in ppv_rows:
+                for item in placeholder_rows:
                     cid = item["id"]
                     title = item["name"]
                     if not cid or not title:
@@ -388,6 +394,7 @@ def build() -> dict:
             "programme_entries": total_programmes,
             "input_channels": len(input_rows),
             "ppv_placeholder_channels": len(ppv_rows),
+            "always_on_placeholder_channels": len(always_on_rows),
             "match_statistics": dict(metrics),
             "limitations": "Missing or conflicting tvg-id in the provider playlist can require manual TiviMate assignment. Programmes depend on the upstream providers.",
         }
