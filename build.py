@@ -27,6 +27,7 @@ from xml.etree import ElementTree as ET
 
 ROOT = Path(__file__).resolve().parent
 DATA = ROOT / "data" / "channels.csv"
+PPV_DATA = ROOT / "data" / "ppv.csv"
 OUT_DIR = ROOT / "site"
 SOURCES = [
     ("DE-EPG", "DE", "https://iptv-epg.org/files/epg-de.xml"),
@@ -176,6 +177,8 @@ def build() -> dict:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     with DATA.open("r", encoding="utf-8-sig", newline="") as csvfile:
         input_rows = list(csv.DictReader(csvfile))
+    with PPV_DATA.open("r", encoding="utf-8-sig", newline="") as csvfile:
+        ppv_rows = list(csv.DictReader(csvfile))
     with tempfile.TemporaryDirectory() as temp:
         temp_dir = Path(temp)
         feeds: list[Feed] = []
@@ -315,6 +318,16 @@ def build() -> dict:
                         elt.append(copy.deepcopy(icon))
                     zipout.write(ET.tostring(elt, encoding="utf-8"))
                     zipout.write(b"\n")
+                # PPV placeholder channels: full provider name as EPG title.
+                # Never imply that these are real broadcast event times.
+                for item in ppv_rows:
+                    cid = item["id"]
+                    title = item["name"]
+                    if not cid or not title:
+                        continue
+                    channel = ET.Element("channel", {"id": cid})
+                    ET.SubElement(channel, "display-name").text = title
+                    zipout.write(ET.tostring(channel, encoding="utf-8") + b"\n")
                 for index, feed in enumerate(feeds):
                     targets = chosen_from_feed[index]
                     if not targets:
@@ -341,6 +354,24 @@ def build() -> dict:
                                     root.clear()
                             elif event == "end" and elem.tag == "channel" and root is not None:
                                 root.clear()
+                from datetime import timedelta
+                today = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+                for item in ppv_rows:
+                    cid = item["id"]
+                    title = item["name"]
+                    if not cid or not title:
+                        continue
+                    for offset in range(-1, 8):
+                        start = today + timedelta(days=offset)
+                        stop = start + timedelta(days=1)
+                        programme = ET.Element("programme", {
+                            "start": start.strftime("%Y%m%d%H%M%S +0000"),
+                            "stop": stop.strftime("%Y%m%d%H%M%S +0000"),
+                            "channel": cid,
+                        })
+                        ET.SubElement(programme, "title", {"lang": "de"}).text = title
+                        zipout.write(ET.tostring(programme, encoding="utf-8") + b"\n")
+                        total_programmes += 1
                 zipout.write(b"</tv>\n")
         if total_programmes == 0:
             temporary_out.unlink(missing_ok=True)
@@ -356,6 +387,7 @@ def build() -> dict:
             "custom_alias_channels": len(aliases),
             "programme_entries": total_programmes,
             "input_channels": len(input_rows),
+            "ppv_placeholder_channels": len(ppv_rows),
             "match_statistics": dict(metrics),
             "limitations": "Missing or conflicting tvg-id in the provider playlist can require manual TiviMate assignment. Programmes depend on the upstream providers.",
         }
