@@ -35,6 +35,7 @@ ROOT = Path(__file__).resolve().parent
 DATA = ROOT / "data" / "channels.csv"
 PPV_DATA = ROOT / "data" / "ppv.csv"
 ALWAYS_ON_DATA = ROOT / "data" / "always_on.csv"
+FRIENDS_DATA = ROOT / "data" / "friends.json"
 OUT_DIR = ROOT / "site"
 SOURCES = [
     ("DE-EPG", "DE", "https://iptv-epg.org/files/epg-de.xml"),
@@ -246,6 +247,55 @@ def best(candidates: list[Channel], market: str, feeds: list[Feed], provider_id:
         winner_score(c, feeds),
     ), reverse=True)
     return result[0]
+
+
+def publish_personal_guides(master: Path) -> int:
+    """Publish one distinct static XMLTV file for each active friend.
+
+    GitHub Pages is PUBLIC: paths in the repository/artifacts are discoverable.
+    This supports manual link management, not authenticated access or IP locks.
+    The previous publicly shared /epg.xml.gz path is removed from the output.
+    """
+    with FRIENDS_DATA.open("r", encoding="utf-8") as source:
+        registry = json.load(source)
+    friends = registry.get("friends", [])
+    if not isinstance(friends, list):
+        raise ValueError("Friend registry must contain a friends list.")
+    unique = set()
+    public_rows = []
+    active_count = 0
+    for record in friends:
+        uid = record["id"]
+        label = record["label"]
+        token = record["token"]
+        if not re.fullmatch(r"[A-Za-z0-9_-]{30,120}", token):
+            raise ValueError("Invalid personal-link token in friends registry.")
+        if token in unique:
+            raise ValueError("Duplicate EPG friend token.")
+        unique.add(token)
+        active = bool(record.get("active"))
+        if active:
+            active_count += 1
+            personal_file = OUT_DIR / "epg" / token / "epg.xml.gz"
+            personal_file.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(master, personal_file)
+        public_rows.append({
+            "id": uid, "label": label, "active": active,
+            "path": "epg/" + token + "/epg.xml.gz" if active else "",
+        })
+    # Remove stale, freely accessible public copy.  Do not leave any master
+    # download route even if all friend links have been revoked.
+    master.unlink(missing_ok=True)
+    (OUT_DIR / "friends.json").write_text(
+        json.dumps({"friends": public_rows, "public_notice":
+                    "All GitHub Pages links and repository metadata are public; "
+                    "links are not confidential and IP/device limits do not apply."},
+                   ensure_ascii=False, separators=(",", ":")),
+        encoding="utf-8",
+    )
+    logging.info("PERSONAL-LINKS: %d active of %d; old shared /epg.xml.gz removed",
+                 active_count, len(friends))
+    return active_count
 
 
 def build() -> dict:
@@ -526,11 +576,15 @@ def build() -> dict:
         with gzip.open(temporary_out, "rb") as f:
             ET.parse(f)
         temporary_out.replace(OUT_DIR / "epg.xml.gz")
+        # Run only after a valid XMLTV was generated.
+        active_friends = publish_personal_guides(OUT_DIR / "epg.xml.gz")
         result = {
             "updated_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
             "feeds_ok": [feed.label for feed in feeds],
             "extra_only_source_channels": extra_channels,
             "base_channels": len(by_id),
+            "active_personal_links": active_friends,
+            "legacy_public_epg_url_disabled": True,
             "custom_alias_channels": len(aliases),
             "programme_entries": total_programmes,
             "input_channels": len(input_rows),
@@ -559,7 +613,7 @@ def build() -> dict:
         result["dashboard_counts"] = dashboard["counts"]
         shutil.copyfile(ROOT / "dashboard" / "index.html", OUT_DIR / "index.html")
         (OUT_DIR / "status.json").write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-        logging.info("DONE: %s channels + %s aliases, %s programme entries, %s bytes", len(by_id), len(aliases), total_programmes, (OUT_DIR / 'epg.xml.gz').stat().st_size)
+        logging.info("DONE: %s channels + %s aliases, %s programme entries, %s friend copies", len(by_id), len(aliases), total_programmes, active_friends)
         return result
 
 
