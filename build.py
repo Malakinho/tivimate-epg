@@ -612,6 +612,7 @@ def build() -> dict:
         result["dashboard_channels"] = dashboard["total"]
         result["dashboard_counts"] = dashboard["counts"]
         shutil.copyfile(ROOT / "dashboard" / "index.html", OUT_DIR / "index.html")
+        shutil.copyfile(ROOT / "dashboard" / "m3u.html", OUT_DIR / "m3u.html")
         (OUT_DIR / "status.json").write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
         logging.info("DONE: %s channels + %s aliases, %s programme entries, %s friend copies", len(by_id), len(aliases), total_programmes, active_friends)
         return result
