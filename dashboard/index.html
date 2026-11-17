@@ -80,6 +80,24 @@
     @media(max-width:1150px){ main { padding:26px 22px } .app { grid-template-columns:206px minmax(0,1fr) } aside { padding:20px 10px } .stats { gap:9px }.stat { padding:16px } .filters { grid-template-columns:1fr 1fr } }
     @media(max-width:760px){ .app { display:block } aside { height:auto;position:relative;border-right:0;border-bottom:1px solid var(--line);padding:12px 14px;display:block } .brand { border:0;padding:1px 0 7px }.brandmark { width:35px;height:35px;font-size:20px }.brandtitle { font-size:15px }.side-label,.side-bottom { display:none } aside nav { display:flex;overflow:auto;gap:6px;padding-top:8px }.navitem { flex:0 0 auto;width:auto;white-space:nowrap;padding:7px 9px;font-size:12px }.navitem .count { display:none } main { padding:24px 14px 50px }.stats { grid-template-columns:1fr 1fr;gap:9px }.stat { padding:14px }.stat-value { font-size:26px }.section-head { padding:17px 13px 15px }.filters { padding:0 13px 15px;grid-template-columns:1fr 1fr;gap:8px }.filters .search-box { grid-column:1/-1 }.table-meta { padding:12px 13px }.footer { padding:14px }.top { margin-bottom:20px }.top-actions .btn { font-size:12px } }
     @media(max-width:390px){ .filters { grid-template-columns:1fr } .filters .search-box { grid-column:auto } }
+
+    .friends-panel { margin:22px 0; }
+    .friends-content { padding:4px 22px 18px; }
+    .friend-notice { color:var(--muted);font-size:12px;line-height:1.5;margin-bottom:14px }
+    .friend-form { display:flex;flex-wrap:wrap;gap:9px;align-items:center;margin-bottom:12px }
+    .friend-form input { flex:1;min-width:170px;max-width:360px }
+    .friend-form button { white-space:nowrap }
+    .friend-grid { display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:11px;margin-top:13px }
+    .friend-card { border:1px solid var(--line);background:var(--panel2);border-radius:12px;padding:13px;min-width:0; }
+    .friend-cardhead { display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px }
+    .friend-name { font-weight:750;overflow-wrap:anywhere }
+    .friend-status { font-size:11px;color:var(--teal);font-weight:700 }
+    .friend-status.blocked { color:var(--red) }
+    .friend-link { font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block;margin-bottom:10px }
+    .friend-buttons { display:flex;flex-wrap:wrap;gap:7px }
+    .friend-buttons .btn { font-size:11px;padding:7px 9px; }
+    .friend-help { font-size:12px;color:var(--muted) }
+    .friend-message { font-size:12px;min-height:18px;color:var(--muted) }
   </style>
 </head>
 <body>
@@ -96,6 +114,8 @@
       <button class="navitem" data-mode="ppv"><span class="symbol">◈</span> PPV-Sender</button>
       <button class="navitem" data-mode="247"><span class="symbol">◷</span> 24/7-Sender</button>
     </nav>
+    <div class="side-label" style="margin-top:15px">Verwaltung</div>
+    <a class="navitem" id="navFriends" href="#friendsPanel"><span class="symbol">♧</span> Freunde &amp; EPG-Links</a>
     <div class="side-bottom">
       <div><span class="dot"></span><strong>GitHub Pages</strong></div>
       <div class="small" id="sideUpdated" style="margin-top:7px">Daten werden geladen …</div>
@@ -105,8 +125,7 @@
     <div class="top">
       <div><p class="eyebrow">Dein EPG-Kontrollzentrum</p><h1>Senderübersicht</h1><p class="subtitle">Alle Sender durchsuchen, EPG-Status prüfen und fehlende Zuordnungen finden.</p></div>
       <div class="top-actions">
-        <a class="btn" href="epg.xml.gz" download>↓ EPG-Datei</a>
-        <button class="btn primary" id="copyUrl">⧉ EPG-Link kopieren</button>
+        <a class="btn primary" href="#friendsPanel">♧ Persönliche EPG-Links verwalten</a>
       </div>
     </div>
     <div class="stats" aria-label="EPG-Kennzahlen">
@@ -118,6 +137,22 @@
     <div class="progress" role="img" id="progress" aria-label="EPG-Abdeckung">
       <span class="ok" id="barOk"></span><span class="placeholder" id="barPlace"></span><span class="no" id="barNo"></span>
     </div>
+    <section class="section friends-panel" id="friendsPanel" aria-labelledby="friendsHeading">
+      <div class="section-head">
+        <div><h2 id="friendsHeading">Freunde &amp; persönliche EPG-Links</h2><p class="section-desc">Neue Links anlegen, kopieren, manuell erneuern oder sperren.</p></div>
+      </div>
+      <div class="friends-content">
+        <p class="friend-notice"><strong>Nur dein GitHub-Konto darf Änderungen speichern.</strong> Eine Schaltfläche öffnet eine vorausgefüllte Anfrage auf GitHub, die du dort mit „Submit new issue“ bestätigst. Das Verwalten geschieht automatisch. <strong>Achtung:</strong> Dieses öffentliche GitHub-Pages-Projekt schützt die persönlichen Linkpfade nicht vor Einsicht in Quellcode/Artefakte. Es gibt keine IP-Sperre und keine automatische Link-Erneuerung.</p>
+        <div class="friend-form">
+          <label class="sr-only" for="newFriend">Bezeichnung für einen neuen Freund</label>
+          <input class="control" type="text" id="newFriend" placeholder="Freund hinzufügen (z. B. Freund 2)" maxlength="45" autocomplete="off">
+          <button type="button" class="btn primary" id="friendAdd">+ Freund anlegen</button>
+          <button type="button" class="btn" id="friendReload">↻ Liste aktualisieren</button>
+        </div>
+        <div class="friend-message" role="status" id="friendMessage">Persönliche Links werden geladen …</div>
+        <div class="friend-grid" id="friendGrid"></div>
+      </div>
+    </section>
     <section class="section" aria-labelledby="sectionTitle">
       <div class="section-head">
         <div><h2 id="sectionTitle">Senderliste</h2><p class="section-desc">Filtere nach Kategorien, Region oder EPG-Status.</p></div>
@@ -163,7 +198,6 @@
   "use strict";
   const $ = function(id){return document.getElementById(id)};
   const format = new Intl.NumberFormat("de-DE");
-  const epgUrl = new URL("epg.xml.gz",location.href).href;
   const names = ["Sendername","Kategorie","Kategorie-ID","Anbieter-EPG-ID","XMLTV-ID","EPG-Status","Region","Art"];
   const statusNames = {programm:"Mit EPG",platzhalter:"Platzhalter",ohne:"Ohne EPG",pruefen:"Zuordnung prüfen"};
   const field = {name:0,cat:1,catId:2,provider:3,xml:4,status:5,region:6,kind:7,claimable:8};
@@ -251,7 +285,7 @@
     page=0;render();
   }
   function selectMode(newMode){
-    mode=newMode;document.querySelectorAll(".navitem").forEach(function(x){x.classList.toggle("active",x.dataset.mode===newMode)});
+    mode=newMode;document.querySelectorAll(".navitem[data-mode]").forEach(function(x){x.classList.toggle("active",x.dataset.mode===newMode)});
     setText("sectionTitle",({all:"Alle Sender",normal:"Normale TV-Sender",programm:"Sender mit EPG",ohne:"Sender ohne EPG",platzhalter:"EPG-Platzhalter",ppv:"PPV-Sender",247:"24/7-Sender"})[newMode]);
     apply();
   }
@@ -264,19 +298,78 @@
     a.href=url;a.download="epg-senderliste-"+mode+"-"+new Date().toISOString().slice(0,10)+".csv";
     document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(url)},2000);
   }
-  async function copyUrl(){
-    try {
-      if(navigator.clipboard&&window.isSecureContext)await navigator.clipboard.writeText(epgUrl);
-      else {const ta=document.createElement("textarea");ta.value=epgUrl;document.body.appendChild(ta);ta.select();document.execCommand("copy");ta.remove()}
-      const btn=$("copyUrl");btn.textContent="✓ Link kopiert";setTimeout(function(){btn.textContent="⧉ EPG-Link kopieren"},1800);
-    } catch (_) {window.prompt("EPG-URL kopieren:",epgUrl)}
+  function friendIssue(action, record) {
+    const params = new URLSearchParams({
+      title: "EPG-Freund verwalten",
+      body: action==="create"
+        ? "action=create\nlabel="+record.label
+        : "action="+action+"\nid="+record.id
+    });
+    window.open("https://github.com/Malakinho/tivimate-epg/issues/new?"+params.toString(),
+                "_blank","noopener,noreferrer");
+    setText("friendMessage","Auf GitHub anmelden und „Submit new issue“ bestätigen. Danach „Liste aktualisieren“ anklicken.");
   }
-  function updateCategoryPicker(){
-    const amount=selectedCategories===null?null:selectedCategories.size;
-    setText("categoryLabel",amount===null?"Alle Kategorien":amount===0?"Keine Kategorie":amount===1?"1 Kategorie":format.format(amount)+" Kategorien");
-    for(const checkbox of $("categoryList").querySelectorAll('input[type="checkbox"]')){
-      checkbox.checked=selectedCategories!==null&&selectedCategories.has(checkbox.value);
+  function friendButton(label, handler, disabled=false) {
+    const btn=document.createElement("button");
+    btn.type="button";btn.className="btn";btn.textContent=label;btn.disabled=disabled;
+    btn.addEventListener("click",handler);
+    return btn;
+  }
+  async function copyFriendLink(path) {
+    const link=new URL(path,location.href).href;
+    try {
+      if(navigator.clipboard && window.isSecureContext)await navigator.clipboard.writeText(link);
+      else {
+        const t=document.createElement("textarea");t.value=link;
+        document.body.appendChild(t);t.select();document.execCommand("copy");t.remove();
+      }
+      setText("friendMessage","Persönlichen EPG-Link kopiert.");
+    } catch (e) { window.prompt("EPG-Link kopieren:",link); }
+  }
+  function displayFriends(payload) {
+    const people=Array.isArray(payload.friends)?payload.friends:[];
+    const grid=$("friendGrid");grid.replaceChildren();
+    if(!people.length){
+      setText("friendMessage","Noch keine Freunde vorhanden.");
+      return;
     }
+    const on=people.filter(f=>f.active).length;
+    setText("friendMessage",on+" aktive EPG-Links · "+people.length+" Einträge insgesamt.");
+    for(const f of people) {
+      const card=document.createElement("article");
+      card.className="friend-card";
+      const head=document.createElement("div");head.className="friend-cardhead";
+      const name=document.createElement("span");name.className="friend-name";name.textContent=f.label;
+      const status=document.createElement("span");
+      status.className="friend-status"+(f.active?"":" blocked");
+      status.textContent=f.active?"● Aktiv":"● Gesperrt";
+      head.append(name,status);
+      const link=document.createElement("div");link.className="friend-link";
+      link.title=f.active?new URL(f.path,location.href).href:"Gesperrt – kein aktiver EPG-Link";
+      link.textContent=f.active?new URL(f.path,location.href).href:"Link gesperrt";
+      const controls=document.createElement("div");controls.className="friend-buttons";
+      if(f.active){
+        controls.append(friendButton("⧉ Kopieren",()=>copyFriendLink(f.path)));
+        controls.append(friendButton("↻ Erneuern",()=>{
+          if(window.confirm("Link von „"+f.label+"“ wirklich erneuern? Der alte Link funktioniert danach nicht mehr."))friendIssue("rotate",f);
+        }));
+        controls.append(friendButton("⛔ Sperren",()=>{
+          if(window.confirm("Den EPG-Link von „"+f.label+"“ wirklich sperren?"))friendIssue("revoke",f);
+        }));
+      }else{
+        controls.append(friendButton("✓ Aktivieren",()=>friendIssue("reactivate",f)));
+        controls.append(friendButton("↻ Neu vergeben",()=>friendIssue("rotate",f)));
+      }
+      card.append(head,link,controls);grid.appendChild(card);
+    }
+  }
+  function loadFriends(){
+    fetch("friends.json",{cache:"no-store"}).then(r=>{
+      if(!r.ok)throw Error("HTTP "+r.status);
+      return r.json();
+    }).then(displayFriends).catch(()=>{
+      setText("friendMessage","Freundeliste konnte nicht geladen werden. Seite neu laden.");
+    });
   }
   function populateCategories(){
     const counts=new Map();
@@ -332,7 +425,7 @@
     setText("lastUpdated","EPG-Daten: "+stamp+" Uhr");
     populateCategories();apply();
   }
-  document.querySelectorAll(".navitem").forEach(function(b){b.addEventListener("click",function(){selectMode(b.dataset.mode)})});
+  document.querySelectorAll(".navitem[data-mode]").forEach(function(b){b.addEventListener("click",function(){selectMode(b.dataset.mode)})});
   ["search","region","status"].forEach(function(id){$(id).addEventListener(id==="search"?"input":"change",apply)});
   $("categoryAll").addEventListener("click",function(){selectedCategories=null;updateCategoryPicker();apply()});
   $("categoryNone").addEventListener("click",function(){selectedCategories=new Set();updateCategoryPicker();apply()});
@@ -346,7 +439,16 @@
   });
   $("next").addEventListener("click",function(){if((page+1)*pageSize<filtered.length){page++;render()}});
   $("prev").addEventListener("click",function(){if(page>0){page--;render()}});
-  $("copyUrl").addEventListener("click",copyUrl);
+  $("friendAdd").addEventListener("click",function(){
+    const label=$("newFriend").value.trim();
+    if(!label){setText("friendMessage","Bitte zuerst einen Freundnamen eingeben.");return;}
+    if(label.includes("\n")||label.includes("\r")||label.includes("=")){
+      setText("friendMessage","Bitte einen Namen ohne Zeilenumbruch oder Gleichheitszeichen eingeben.");return;
+    }
+    friendIssue("create",{label});
+  });
+  $("friendReload").addEventListener("click",loadFriends);
+  loadFriends();
   $("exportBtn").addEventListener("click",exportCsv);
   fetch("dashboard.json",{cache:"no-store"}).then(function(r){if(!r.ok)throw Error("HTTP "+r.status);return r.json()}).then(init).catch(function(){
     state.hidden=false;state.textContent="Senderdaten konnten nicht geladen werden. Bitte Seite neu laden.";
