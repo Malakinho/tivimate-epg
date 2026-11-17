@@ -43,7 +43,14 @@ SOURCES = [
     ("GR-COSMOTE", "GR", "https://iptv-org.github.io/epg/guides/el/cosmote.gr.xml"),
     ("GR-NOVASPORTS", "GR", "https://iptv-org.github.io/epg/guides/el/novasports.gr.xml"),
     ("DE-MASTER", "DE", "https://kaimandura.github.io/epg-de/DE-MASTER.xml.gz"),
+    # Supplemental, publicly accessible XMLTV feeds. Never supersede an
+    # existing channel ID from our established sources.
+    ("DE-FREEEPG", "DE", "https://free-epg.de/api/epg/de.xml.gz"),
+    ("GR-FREEEPG", "GR", "https://free-epg.de/api/epg/gr.xml.gz"),
+    ("DE-XMLTVLIVE", "DE", "https://xmltv.live/epg/de.xml.gz"),
+    ("GR-XMLTVLIVE", "GR", "https://xmltv.live/epg/gr.xml.gz"),
 ]
+EXTRA_FEED_LABELS = {"DE-FREEEPG", "GR-FREEEPG", "DE-XMLTVLIVE", "GR-XMLTVLIVE"}
 # These are design hints only. Do not infer the actual licence for TV metadata.
 MAX_DOWNLOAD = 180 * 1024 * 1024
 BAD_IDS = {"", "TS", "N/A", "NONE", "NULL", "0", "-"}
@@ -257,17 +264,38 @@ def build() -> dict:
         if not feeds:
             raise RuntimeError("No live EPG source could be downloaded. No output overwritten.")
 
-        per_feed = [inspect_feed(feed, i) for i, feed in enumerate(feeds)]
+        per_feed = []
+        working_feeds = []
+        for feed in feeds:
+            try:
+                channels = inspect_feed(feed, len(working_feeds))
+                if feed.label in EXTRA_FEED_LABELS and not any(c.programmes for c in channels.values()):
+                    logging.warning("Skipping source without programmes: %s", feed.label)
+                    continue
+                per_feed.append(channels)
+                working_feeds.append(feed)
+            except Exception as error:
+                if feed.label not in EXTRA_FEED_LABELS:
+                    raise
+                logging.warning("Skipping unusable optional EPG %s: %s", feed.label, type(error).__name__)
+        feeds = working_feeds
         by_id: dict[str, Channel] = {}
         for feed_channels in per_feed:
             for ch in feed_channels.values():
                 if ch.programmes <= 0:
                     continue
                 prev = by_id.get(ch.id.casefold())
-                if prev is None or winner_score(ch, feeds) > winner_score(prev, feeds):
+                existing_is_extra = prev is not None and feeds[prev.feed].label in EXTRA_FEED_LABELS
+                candidate_is_extra = feeds[ch.feed].label in EXTRA_FEED_LABELS
+                if (prev is None
+                        or (existing_is_extra and not candidate_is_extra)
+                        or (existing_is_extra == candidate_is_extra
+                            and winner_score(ch, feeds) > winner_score(prev, feeds))):
                     by_id[ch.id.casefold()] = ch
         if not by_id:
             raise RuntimeError("Downloaded feeds have no programmes. No output overwritten.")
+        extra_channels = sum(feeds[ch.feed].label in EXTRA_FEED_LABELS for ch in by_id.values())
+        logging.info("Supplementary guides: %s extra-only XMLTV channels", extra_channels)
 
         by_name: defaultdict[str, list[Channel]] = defaultdict(list)
         for ch in by_id.values():
@@ -330,6 +358,8 @@ def build() -> dict:
                 metrics["unmatched"] += 1
                 continue
             metrics["matched_input_rows"] += 1
+            if feeds[chosen.feed].label in EXTRA_FEED_LABELS:
+                metrics["extra_source_input_matches"] += 1
             if id_valid(user_id):
                 # Do not hijack an ID that is already published for a different real channel.
                 if user_id.casefold() in by_id:
@@ -481,6 +511,7 @@ def build() -> dict:
         result = {
             "updated_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
             "feeds_ok": [feed.label for feed in feeds],
+            "extra_only_source_channels": extra_channels,
             "base_channels": len(by_id),
             "custom_alias_channels": len(aliases),
             "programme_entries": total_programmes,
