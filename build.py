@@ -493,6 +493,8 @@ def build() -> dict:
             "match_statistics": dict(metrics),
             "limitations": "Missing or conflicting tvg-id in the provider playlist can require manual TiviMate assignment. Programmes depend on the upstream providers.",
         }
+        with (ROOT / "data" / "manual_approvals.json").open("r", encoding="utf-8") as approval_file:
+            manual_approvals = json.load(approval_file).get("approved", [])
         dashboard = make_dashboard(
             inventory_path=ROOT / "data" / "inventory.csv",
             output_path=OUT_DIR / "dashboard.json",
@@ -502,6 +504,7 @@ def build() -> dict:
             clean_name=clean_name, market_of=market_of, best=best, id_valid=id_valid,
             live_ppv=bool(xtream_url),
             provider_fallback_ids=provider_fallback_ids,
+            manual_approvals=manual_approvals,
         )
         result["dashboard_channels"] = dashboard["total"]
         result["dashboard_counts"] = dashboard["counts"]
