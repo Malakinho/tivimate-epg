@@ -70,6 +70,7 @@ def make_dashboard(*, inventory_path: Path, output_path: Path, ppv_rows,
         norm = clean_name(name)
         actual = None
         display_id = ""
+        uncertain_id = ""
         if id_valid(provider_id):
             direct = by_id.get(provider_id.casefold())
             if direct:
@@ -83,6 +84,8 @@ def make_dashboard(*, inventory_path: Path, output_path: Path, ppv_rows,
                 if overlap >= .5 and not wrong_sky:
                     actual = direct
                     display_id = provider_id
+                else:
+                    uncertain_id = provider_id
 
         if actual is None and norm:
             named = best(by_name.get(norm, []), market, feeds, provider_id)
@@ -106,6 +109,11 @@ def make_dashboard(*, inventory_path: Path, output_path: Path, ppv_rows,
             add(name, cat, category_id, provider_id,
                 provider_fallback_ids[provider_id.casefold()],
                 "programm", market, kind)
+        elif uncertain_id:
+            # The ID has a published schedule, but the source title is at odds
+            # with the channel name. Flag it instead of calling it missing.
+            add(name, cat, category_id, provider_id, uncertain_id,
+                "pruefen", market, kind)
         else:
             add(name, cat, category_id, provider_id, "", "ohne", market, kind)
 
