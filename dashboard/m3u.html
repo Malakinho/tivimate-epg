@@ -88,7 +88,7 @@
     return m?m[1]:"";
   }
   function setTvgId(info,id) {
-    const escaped=id.replace(/&/g,"&amp;").replace(/"/g,"&quot;");
+    const escaped=id.replace(/"/g,"&quot;");
     const re=/(^|\s)tvg-id\s*=\s*"[^"]*"/i;
     return re.test(info)?info.replace(re,(all,space)=>space+'tvg-id="'+escaped+'"'):
       info.replace(/^#EXTINF:([^\s,]*)/i,(_,duration)=>'#EXTINF:'+duration+' tvg-id="'+escaped+'"');
@@ -136,7 +136,7 @@
     }
     // Attribute names are universally untrusted. Never concatenate raw user
     // input before validating the URL and escaping quotes.
-    const safe=epg.replace(/&/g,"&amp;").replace(/"/g,"&quot;");
+    const safe=epg.replace(/"/g,"&quot;");
     return header+' x-tvg-url="'+safe+'" url-tvg="'+safe+'"';
   }
   function fixPlaylist(text,index,epg) {
@@ -161,7 +161,7 @@
     }
     const first=lines.findIndex(x=>x.trim().length>0);
     if(first>=0&&lines[first].startsWith("#EXTM3U"))lines[first]=rewriteHeader(lines[first],epg);
-    else lines.unshift('#EXTM3U x-tvg-url="'+epg.replace(/&/g,"&amp;")+'" url-tvg="'+epg.replace(/&/g,"&amp;")+'"');
+    else lines.unshift('#EXTM3U x-tvg-url="'+epg+'" url-tvg="'+epg+'"');
     return {output:lines.join(lf),total,touched,known};
   }
   let index=null;
