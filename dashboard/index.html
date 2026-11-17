@@ -40,12 +40,30 @@
     .stat-value { font-size:clamp(26px,2.7vw,37px);font-weight:760;letter-spacing:-1.1px;margin:11px 0 1px;font-variant-numeric:tabular-nums;line-height:1.15 }
     .stat-detail { color:#8da0b8;font-size:11px }.progress { width:100%;height:9px;border-radius:100px;display:flex;overflow:hidden;background:#29364c;margin:0 0 22px }
     .progress > span { height:100% }.progress .ok { background:#42d8bb }.progress .placeholder { background:#f6c873 }.progress .no { background:#dd6678 }
-    .section { background:var(--panel);border:1px solid var(--line);border-radius:15px;overflow:hidden }
+    .section { background:var(--panel);border:1px solid var(--line);border-radius:15px;overflow:visible }
     .section-head { padding:23px 22px 18px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap }
     h2 { font-size:17px;letter-spacing:-.4px;margin:0 }.section-desc { color:var(--muted);margin:4px 0 0;font-size:12px }
-    .filters { display:grid;grid-template-columns:minmax(190px,2.1fr) minmax(140px,1fr) minmax(128px,.9fr) minmax(140px,1fr);gap:10px;padding:0 22px 18px }
+    .filters { display:grid;grid-template-columns:minmax(190px,2.1fr) minmax(140px,1fr) minmax(128px,.9fr) minmax(140px,1fr);gap:10px;padding:0 22px 18px;position:relative;z-index:4 }
     .control { min-width:0;background:#0b1425;border:1px solid #2a3c56;border-radius:10px;color:var(--ink);padding:11px 12px;width:100%;height:43px;outline:none }
     .control::placeholder { color:#71849e } .control:focus { border-color:var(--teal) }
+    .categories-picker { position:relative;min-width:0 }
+    .categories-picker summary { list-style:none;display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;user-select:none }
+    .categories-picker summary::-webkit-details-marker { display:none }
+    .categories-picker summary::after { content:"⌄";color:var(--muted);font-size:18px;line-height:1;flex:none }
+    .categories-picker[open] summary { border-color:var(--teal) }
+    .category-popup { position:absolute;top:calc(100% + 6px);left:0;width:min(350px,calc(100vw - 42px));background:#111e32;border:1px solid #3b5372;border-radius:12px;box-shadow:0 18px 38px rgba(0,0,0,.5);overflow:hidden;z-index:15 }
+    .category-tools { padding:11px;border-bottom:1px solid var(--line);display:flex;gap:7px;align-items:center }
+    .category-tools button { padding:7px 9px;border:1px solid var(--line);color:#b8d4e3;background:#1a2a41;border-radius:7px;font-size:11px;white-space:nowrap }
+    .category-tools button:hover { color:var(--teal);border-color:var(--teal) }
+    .category-list { max-height:285px;overflow-y:auto;padding:6px }
+    .category-option { display:flex;gap:10px;align-items:center;padding:8px 10px;border-radius:8px;cursor:pointer;min-width:0;font-size:12px }
+    .category-option:hover { background:#1d314b }
+    .category-option input { accent-color:var(--teal);width:16px;height:16px;flex-shrink:0;cursor:pointer }
+    .category-option .category-name { flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis }
+    .category-option .category-count { color:var(--muted);font-variant-numeric:tabular-nums }
+    .category-option[hidden],.category-empty[hidden] { display:none }
+    .category-empty { padding:14px;color:var(--muted);font-size:12px;text-align:center }
+    .category-footnote { border-top:1px solid var(--line);padding:9px 12px;color:var(--muted);font-size:11px }
     select.control { appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2392a3ba' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 13px center;padding-right:31px }
     .table-meta { display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 22px;background:#0e1929;border-top:1px solid var(--line);border-bottom:1px solid var(--line);font-size:12px;color:var(--muted) }
     .table-wrap { width:100%;overflow:auto } table { width:100%;border-collapse:collapse;white-space:nowrap } th { font-size:10px;text-transform:uppercase;letter-spacing:.9px;color:#92a7c1;text-align:left;background:#101c2e;padding:14px 17px;font-weight:740 }
@@ -107,7 +125,20 @@
       </div>
       <div class="filters">
         <label class="search-box"><span class="sr-only">Sender oder EPG-ID suchen</span><input class="control" id="search" type="search" placeholder="⌕  Sendername oder EPG-ID suchen …" autocomplete="off"></label>
-        <label><span class="sr-only">Kategorie wählen</span><select class="control" id="category"><option value="">Alle Kategorien</option></select></label>
+        <details class="categories-picker" id="categoryPicker">
+          <summary class="control" aria-label="Mehrere Kategorien auswählen"><span id="categoryLabel">Alle Kategorien</span></summary>
+          <div class="category-popup">
+            <div class="category-tools">
+              <button type="button" id="categoryAll">Alle anzeigen</button>
+              <button type="button" id="categoryNone">Keine auswählen</button>
+            </div>
+            <label class="sr-only" for="categorySearch">Kategorien durchsuchen</label>
+            <input class="control" id="categorySearch" type="search" placeholder="Kategorien suchen …" autocomplete="off" style="height:36px;width:calc(100% - 22px);margin:10px 11px 4px">
+            <div class="category-list" id="categoryList" role="group" aria-label="Kategorien zum Anzeigen"></div>
+            <div class="category-empty" id="categoryEmpty" hidden>Keine Kategorien gefunden</div>
+            <div class="category-footnote">Mehrere Häkchen gleichzeitig möglich.</div>
+          </div>
+        </details>
         <label><span class="sr-only">Region wählen</span><select class="control" id="region"><option value="">Alle Regionen</option><option value="DE">Deutschland</option><option value="GR">Griechenland</option><option value="DE/International">PPV – Live</option></select></label>
         <label><span class="sr-only">Status wählen</span><select class="control" id="status"><option value="">Alle Status</option><option value="programm">Mit Programmdaten</option><option value="platzhalter">Nur Platzhalter</option><option value="ohne">Ohne EPG</option><option value="pruefen">Zuordnung prüfen</option><option value="provider_no_xml">Anbieter-ID vorhanden, XMLTV-ID fehlt</option></select></label>
       </div>
@@ -137,6 +168,8 @@
   const statusNames = {programm:"Mit EPG",platzhalter:"Platzhalter",ohne:"Ohne EPG",pruefen:"Zuordnung prüfen"};
   const field = {name:0,cat:1,catId:2,provider:3,xml:4,status:5,region:6,kind:7,claimable:8};
   let data = [],filtered = [],mode = "all",page = 0;
+  // null = alle Kategorien, Set() = keine Kategorien.
+  let selectedCategories = null;
   const pageSize = 80;
   const state = $("state");
   function setText(id,text){$(id).textContent=text}
@@ -197,7 +230,7 @@
   }
   function apply() {
     const search=$("search").value.toLocaleLowerCase("de").trim(),
-      cat=$("category").value,region=$("region").value,status=$("status").value;
+      region=$("region").value,status=$("status").value;
     filtered=data.filter(function(r){
       const st=r[field.status],kind=r[field.kind];
       if(mode==="normal"&&kind!=="Sender")return false;
@@ -206,7 +239,7 @@
       if(mode==="ohne"&&st!=="ohne"&&st!=="pruefen")return false;
       if(mode==="ppv"&&kind!=="PPV")return false;
       if(mode==="247"&&kind!=="24/7")return false;
-      if(cat&&r[field.catId]!==cat)return false;
+      if(selectedCategories!==null&&!selectedCategories.has(String(r[field.catId])))return false;
       if(region&&r[field.region]!==region)return false;
       if(status==="provider_no_xml"){
         const pid=String(r[field.provider]||"").trim(),xid=String(r[field.xml]||"").trim();
@@ -238,11 +271,51 @@
       const btn=$("copyUrl");btn.textContent="✓ Link kopiert";setTimeout(function(){btn.textContent="⧉ EPG-Link kopieren"},1800);
     } catch (_) {window.prompt("EPG-URL kopieren:",epgUrl)}
   }
+  function updateCategoryPicker(){
+    const amount=selectedCategories===null?null:selectedCategories.size;
+    setText("categoryLabel",amount===null?"Alle Kategorien":amount===0?"Keine Kategorie":amount===1?"1 Kategorie":format.format(amount)+" Kategorien");
+    for(const checkbox of $("categoryList").querySelectorAll('input[type="checkbox"]')){
+      checkbox.checked=selectedCategories!==null&&selectedCategories.has(checkbox.value);
+    }
+  }
   function populateCategories(){
     const counts=new Map();
-    for(const r of data){const key=r[field.catId];const obj=counts.get(key)||{name:r[field.cat],n:0};obj.n++;counts.set(key,obj)}
-    const select=$("category");const sorted=[...counts].sort(function(a,b){return a[1].name.localeCompare(b[1].name,"de")});
-    for(const pair of sorted){const op=document.createElement("option");op.value=pair[0];op.textContent=pair[1].name+" ("+format.format(pair[1].n)+")";select.appendChild(op)}
+    for(const r of data){
+      const key=String(r[field.catId]),obj=counts.get(key)||{name:r[field.cat],n:0};
+      obj.n++;counts.set(key,obj);
+    }
+    const list=$("categoryList");
+    list.replaceChildren();
+    const sorted=[...counts].sort(function(a,b){return a[1].name.localeCompare(b[1].name,"de")});
+    for(const pair of sorted){
+      const label=document.createElement("label");
+      label.className="category-option";
+      const cb=document.createElement("input");
+      cb.type="checkbox";cb.value=pair[0];cb.name="selectedCategories";
+      const name=document.createElement("span");
+      name.className="category-name";name.textContent=pair[1].name;
+      const count=document.createElement("span");
+      count.className="category-count";count.textContent=format.format(pair[1].n);
+      label.append(cb,name,count);
+      cb.addEventListener("change",function(){
+        if(selectedCategories===null)selectedCategories=new Set();
+        if(cb.checked)selectedCategories.add(cb.value);
+        else selectedCategories.delete(cb.value);
+        updateCategoryPicker();apply();
+      });
+      list.appendChild(label);
+    }
+    updateCategoryPicker();
+  }
+  function searchCategories(){
+    const q=$("categorySearch").value.trim().toLocaleLowerCase("de");
+    let visible=0;
+    for(const label of $("categoryList").querySelectorAll(".category-option")){
+      const text=label.querySelector(".category-name").textContent.toLocaleLowerCase("de");
+      label.hidden=Boolean(q)&&!text.includes(q);
+      if(!label.hidden)visible++;
+    }
+    $("categoryEmpty").hidden=visible!==0;
   }
   function init(payload){
     if(!payload||!Array.isArray(payload.rows))throw Error("Ungültiges Datenformat");
@@ -260,7 +333,17 @@
     populateCategories();apply();
   }
   document.querySelectorAll(".navitem").forEach(function(b){b.addEventListener("click",function(){selectMode(b.dataset.mode)})});
-  ["search","category","region","status"].forEach(function(id){$(id).addEventListener(id==="search"?"input":"change",apply)});
+  ["search","region","status"].forEach(function(id){$(id).addEventListener(id==="search"?"input":"change",apply)});
+  $("categoryAll").addEventListener("click",function(){selectedCategories=null;updateCategoryPicker();apply()});
+  $("categoryNone").addEventListener("click",function(){selectedCategories=new Set();updateCategoryPicker();apply()});
+  $("categorySearch").addEventListener("input",searchCategories);
+  document.addEventListener("click",function(event){
+    const picker=$("categoryPicker");
+    if(picker.open&&!picker.contains(event.target))picker.open=false;
+  });
+  document.addEventListener("keydown",function(event){
+    if(event.key==="Escape")$("categoryPicker").open=false;
+  });
   $("next").addEventListener("click",function(){if((page+1)*pageSize<filtered.length){page++;render()}});
   $("prev").addEventListener("click",function(){if(page>0){page--;render()}});
   $("copyUrl").addEventListener("click",copyUrl);
