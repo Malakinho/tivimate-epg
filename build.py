@@ -35,6 +35,7 @@ SOURCES = [
     ("GR-EPG", "GR", "https://iptv-epg.org/files/epg-gr.xml"),
     ("GR-GREEKTV", "GR", "https://ext.greektv.app/epg/epg.xml.gz"),
     ("GR-COSMOTE", "GR", "https://iptv-org.github.io/epg/guides/el/cosmote.gr.xml"),
+    ("GR-NOVASPORTS", "GR", "https://iptv-org.github.io/epg/guides/el/novasports.gr.xml"),
     ("DE-MASTER", "DE", "https://kaimandura.github.io/epg-de/DE-MASTER.xml.gz"),
 ]
 # These are design hints only. Do not infer the actual licence for TV metadata.
