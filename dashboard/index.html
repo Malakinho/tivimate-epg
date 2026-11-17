@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0a1020">
+  <meta name="description" content="EPG Manager: Senderstatus, Programmdaten, PPV und 24/7 übersichtlich durchsuchen.">
+  <title>EPG Manager · Senderübersicht</title>
+  <style>
+    :root { color-scheme: dark; --bg:#080d19; --side:#0d1526; --panel:#111b2e; --panel2:#16233a; --line:#25334b; --ink:#eef3fc; --muted:#92a3ba; --teal:#42d8bb; --tealfade:rgba(66,216,187,.13); --red:#f48793; --yellow:#f6c873; --font:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Arial,sans-serif }
+    * { box-sizing:border-box } html { scroll-behavior:smooth } body { margin:0; background:var(--bg); color:var(--ink); font-family:var(--font); font-size:14px; line-height:1.5 }
+    a { color:inherit;text-decoration:none } button,input,select { font:inherit } button { cursor:pointer }
+    button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible { outline:2px solid var(--teal);outline-offset:3px }
+    .app { display:grid;grid-template-columns:248px minmax(0,1fr);min-height:100vh }
+    aside { background:var(--side);border-right:1px solid var(--line);padding:26px 15px;position:sticky;top:0;height:100vh;display:flex;flex-direction:column }
+    .brand { display:flex;align-items:center;gap:13px;padding:4px 10px 25px;border-bottom:1px solid var(--line) }
+    .brandmark { height:42px;width:42px;border-radius:13px;background:linear-gradient(135deg,#46eac8,#1d7394);color:#061323;display:grid;place-items:center;font-size:23px;font-weight:850;box-shadow:0 7px 30px rgba(59,208,187,.17) }
+    .brandtitle { font-weight:780;font-size:17px;letter-spacing:-.45px }.brandsub { color:var(--muted);font-size:11px }
+    .side-label { color:#7891ae;text-transform:uppercase;letter-spacing:1.4px;font-size:10px;font-weight:800;padding:24px 14px 9px }
+    .navitem { border:1px solid transparent;background:none;text-align:left;color:#b8c9da;display:flex;align-items:center;gap:10px;padding:11px 13px;border-radius:10px;font-weight:570;width:100%;margin:2px 0 }
+    .navitem:hover { background:#192840 } .navitem.active { color:var(--teal);background:var(--tealfade);border-color:#28554e }
+    .navitem .symbol { width:21px;text-align:center;font-size:16px } .navitem .count { margin-left:auto;font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums }
+    .side-bottom { margin-top:auto;border-top:1px solid var(--line);padding:19px 12px 3px }.small { color:var(--muted);font-size:12px }.dot { display:inline-block;width:8px;height:8px;background:var(--teal);border-radius:50%;margin-right:7px;box-shadow:0 0 0 4px rgba(66,216,187,.12)}
+    main { min-width:0;padding:30px 36px 60px;max-width:1740px;width:100%;margin:0 auto }
+    .top { display:flex;align-items:start;justify-content:space-between;gap:18px;flex-wrap:wrap;margin-bottom:27px }
+    .eyebrow { font-size:11px;letter-spacing:1.8px;color:var(--teal);text-transform:uppercase;font-weight:790;margin:0 0 7px }
+    h1 { margin:0;font-size:clamp(26px,3vw,36px);letter-spacing:-1.3px;line-height:1.2 }
+    .subtitle { color:var(--muted);margin:8px 0 0;font-size:13px }
+    .top-actions { display:flex;align-items:center;flex-wrap:wrap;gap:10px }
+    .btn { border:1px solid var(--line);border-radius:10px;padding:10px 14px;background:var(--panel);color:var(--ink);font-weight:650;display:inline-flex;justify-content:center;align-items:center;gap:8px;min-height:40px }
+    .btn:hover { border-color:#47718c;background:#1b2e48 } .btn.primary { border:1px solid #45cfb4;background:var(--teal);color:#071a21 } .btn.primary:hover { background:#7cead6 }
+    .stats { display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-bottom:22px }
+    .stat { background:var(--panel);border:1px solid var(--line);border-radius:15px;padding:19px 19px 17px;position:relative;overflow:hidden }
+    .stat:before { content:"";position:absolute;top:0;left:0;right:0;height:2px;background:#415779 }
+    .stat.teal:before { background:var(--teal) }.stat.yellow:before { background:var(--yellow) }.stat.red:before { background:var(--red) }
+    .stat-label { color:var(--muted);font-size:12px;font-weight:570;display:flex;align-items:center;gap:7px }
+    .stat-value { font-size:clamp(26px,2.7vw,37px);font-weight:760;letter-spacing:-1.1px;margin:11px 0 1px;font-variant-numeric:tabular-nums;line-height:1.15 }
+    .stat-detail { color:#8da0b8;font-size:11px }.progress { width:100%;height:9px;border-radius:100px;display:flex;overflow:hidden;background:#29364c;margin:0 0 22px }
+    .progress > span { height:100% }.progress .ok { background:#42d8bb }.progress .placeholder { background:#f6c873 }.progress .no { background:#dd6678 }
+    .section { background:var(--panel);border:1px solid var(--line);border-radius:15px;overflow:hidden }
+    .section-head { padding:23px 22px 18px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap }
+    h2 { font-size:17px;letter-spacing:-.4px;margin:0 }.section-desc { color:var(--muted);margin:4px 0 0;font-size:12px }
+    .filters { display:grid;grid-template-columns:minmax(190px,2.1fr) minmax(140px,1fr) minmax(128px,.9fr) minmax(140px,1fr);gap:10px;padding:0 22px 18px }
+    .control { min-width:0;background:#0b1425;border:1px solid #2a3c56;border-radius:10px;color:var(--ink);padding:11px 12px;width:100%;height:43px;outline:none }
+    .control::placeholder { color:#71849e } .control:focus { border-color:var(--teal) }
+    select.control { appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2392a3ba' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 13px center;padding-right:31px }
+    .table-meta { display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 22px;background:#0e1929;border-top:1px solid var(--line);border-bottom:1px solid var(--line);font-size:12px;color:var(--muted) }
+    .table-wrap { width:100%;overflow:auto } table { width:100%;border-collapse:collapse;white-space:nowrap } th { font-size:10px;text-transform:uppercase;letter-spacing:.9px;color:#92a7c1;text-align:left;background:#101c2e;padding:14px 17px;font-weight:740 }
+    td { padding:13px 17px;border-top:1px solid #203048;color:#d3deee;font-size:12px;max-width:400px } th:first-child,td:first-child { padding-left:22px }
+    td.channel { font-weight:650;color:#eef3fc;max-width:400px;overflow:hidden;text-overflow:ellipsis } td.category { max-width:210px;overflow:hidden;text-overflow:ellipsis;color:#a6b6ca } td.id { font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:11px;color:#9fb0c8;max-width:190px;overflow:hidden;text-overflow:ellipsis }
+    tr:hover td { background:#172740 } .pill { display:inline-flex;gap:5px;align-items:center;white-space:nowrap;border-radius:7px;padding:4px 8px;font-size:11px;font-weight:690 }
+    .pill.ok { background:rgba(66,216,187,.12);color:#75eed6 } .pill.placeholder { background:rgba(246,200,115,.12);color:#f6ce89 } .pill.no { background:rgba(244,135,147,.13);color:#ffaab2 }
+    .footer { display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;padding:17px 22px;border-top:1px solid var(--line);color:var(--muted);font-size:12px }
+    .pages { display:flex;align-items:center;gap:9px }.pages .btn { padding:7px 11px;min-height:32px } .btn:disabled { opacity:.35;cursor:default }
+    .hint { margin-top:20px;padding:14px 18px;border:1px solid #2a3e58;border-radius:11px;color:#a9bdd0;background:#101b2d;font-size:12px }
+    .hint strong { color:#dce7f4 } .hint a { color:var(--teal);text-decoration:underline;text-underline-offset:3px }
+    #state { text-align:center;padding:45px 20px;color:var(--muted) } #state[hidden],.hidden { display:none!important }
+    .ghost { color:var(--muted);font-size:12px } .sr-only { position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap }
+    @media(max-width:1150px){ main { padding:26px 22px } .app { grid-template-columns:206px minmax(0,1fr) } aside { padding:20px 10px } .stats { gap:9px }.stat { padding:16px } .filters { grid-template-columns:1fr 1fr } }
+    @media(max-width:760px){ .app { display:block } aside { height:auto;position:relative;border-right:0;border-bottom:1px solid var(--line);padding:12px 14px;display:block } .brand { border:0;padding:1px 0 7px }.brandmark { width:35px;height:35px;font-size:20px }.brandtitle { font-size:15px }.side-label,.side-bottom { display:none } aside nav { display:flex;overflow:auto;gap:6px;padding-top:8px }.navitem { flex:0 0 auto;width:auto;white-space:nowrap;padding:7px 9px;font-size:12px }.navitem .count { display:none } main { padding:24px 14px 50px }.stats { grid-template-columns:1fr 1fr;gap:9px }.stat { padding:14px }.stat-value { font-size:26px }.section-head { padding:17px 13px 15px }.filters { padding:0 13px 15px;grid-template-columns:1fr 1fr;gap:8px }.filters .search-box { grid-column:1/-1 }.table-meta { padding:12px 13px }.footer { padding:14px }.top { margin-bottom:20px }.top-actions .btn { font-size:12px } }
+    @media(max-width:390px){ .filters { grid-template-columns:1fr } .filters .search-box { grid-column:auto } }
+  </style>
+</head>
+<body>
+<div class="app">
+  <aside>
+    <div class="brand"><div class="brandmark" aria-hidden="true">≋</div><div><div class="brandtitle">EPG Manager</div><div class="brandsub">Sender &amp; Programmdaten</div></div></div>
+    <div class="side-label">Übersicht</div>
+    <nav aria-label="EPG-Filter">
+      <button class="navitem active" data-mode="all"><span class="symbol">▦</span> Alle Sender <span class="count" id="navTotal">–</span></button>
+      <button class="navitem" data-mode="programm"><span class="symbol">◉</span> Mit EPG <span class="count" id="navOk">–</span></button>
+      <button class="navitem" data-mode="ohne"><span class="symbol">◌</span> Ohne EPG <span class="count" id="navNo">–</span></button>
+      <button class="navitem" data-mode="platzhalter"><span class="symbol">▤</span> Platzhalter <span class="count" id="navPlace">–</span></button>
+      <button class="navitem" data-mode="ppv"><span class="symbol">◈</span> PPV-Sender</button>
+      <button class="navitem" data-mode="247"><span class="symbol">◷</span> 24/7-Sender</button>
+    </nav>
+    <div class="side-bottom">
+      <div><span class="dot"></span><strong>GitHub Pages</strong></div>
+      <div class="small" id="sideUpdated" style="margin-top:7px">Daten werden geladen …</div>
+    </div>
+  </aside>
+  <main>
+    <div class="top">
+      <div><p class="eyebrow">Dein EPG-Kontrollzentrum</p><h1>Senderübersicht</h1><p class="subtitle">Alle Sender durchsuchen, EPG-Status prüfen und fehlende Zuordnungen finden.</p></div>
+      <div class="top-actions">
+        <a class="btn" href="epg.xml.gz" download>↓ EPG-Datei</a>
+        <button class="btn primary" id="copyUrl">⧉ EPG-Link kopieren</button>
+      </div>
+    </div>
+    <div class="stats" aria-label="EPG-Kennzahlen">
+      <div class="stat"><div class="stat-label">◫ &nbsp; Sender insgesamt</div><div class="stat-value" id="total">–</div><div class="stat-detail">Senderliste &amp; Live-PPV</div></div>
+      <div class="stat teal"><div class="stat-label">◉ &nbsp; Programmdaten</div><div class="stat-value" id="ok">–</div><div class="stat-detail">Treffer in XMLTV</div></div>
+      <div class="stat yellow"><div class="stat-label">▤ &nbsp; Platzhalter</div><div class="stat-value" id="placeholder">–</div><div class="stat-detail">PPV &amp; 24/7 mit Sendername</div></div>
+      <div class="stat red"><div class="stat-label">◌ &nbsp; Ohne EPG</div><div class="stat-value" id="missing">–</div><div class="stat-detail">Noch ohne passenden Treffer</div></div>
+    </div>
+    <div class="progress" role="img" id="progress" aria-label="EPG-Abdeckung">
+      <span class="ok" id="barOk"></span><span class="placeholder" id="barPlace"></span><span class="no" id="barNo"></span>
+    </div>
+    <section class="section" aria-labelledby="sectionTitle">
+      <div class="section-head">
+        <div><h2 id="sectionTitle">Senderliste</h2><p class="section-desc">Filtere nach Kategorien, Region oder EPG-Status.</p></div>
+        <button class="btn" id="exportBtn">↓ Gefilterte CSV</button>
+      </div>
+      <div class="filters">
+        <label class="search-box"><span class="sr-only">Sender oder EPG-ID suchen</span><input class="control" id="search" type="search" placeholder="⌕  Sendername oder EPG-ID suchen …" autocomplete="off"></label>
+        <label><span class="sr-only">Kategorie wählen</span><select class="control" id="category"><option value="">Alle Kategorien</option></select></label>
+        <label><span class="sr-only">Region wählen</span><select class="control" id="region"><option value="">Alle Regionen</option><option value="DE">Deutschland</option><option value="GR">Griechenland</option><option value="DE/International">PPV – Live</option></select></label>
+        <label><span class="sr-only">Status wählen</span><select class="control" id="status"><option value="">Alle Status</option><option value="programm">Mit Programmdaten</option><option value="platzhalter">Nur Platzhalter</option><option value="ohne">Ohne EPG</option></select></label>
+      </div>
+      <div class="table-meta"><span id="shown">Lade Senderdaten …</span><span id="lastUpdated">–</span></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Sendername</th><th>Kategorie</th><th>EPG-Status</th><th>Anbieter-ID</th><th>XMLTV-ID</th></tr></thead>
+          <tbody id="tbody"></tbody>
+        </table>
+        <div id="state" role="status">Die Senderliste wird geladen …</div>
+      </div>
+      <div class="footer"><div id="pageSummary">–</div><div class="pages"><button class="btn" id="prev">← Zurück</button><span id="pageLabel">–</span><button class="btn" id="next">Weiter →</button></div></div>
+    </section>
+    <div class="hint">
+      <strong>Was bedeutet der Status?</strong> „Mit EPG“ bedeutet, dass wir passende Programmdaten in der XMLTV gefunden haben – nicht zwingend, dass TiviMate oder iMPlayer die Zuordnung automatisch vorgenommen hat. „Platzhalter“ zeigt bei PPV und 24/7 den Sendernamen als Programmtitel. <br>
+      <span style="display:inline-block;margin-top:5px">Die Webapp ist eine <strong>schreibgeschützte Übersicht</strong>. Deine Zugangsdaten sind nicht enthalten. Änderungen an EPG-IDs werden derzeit weiterhin über den Generator vorgenommen. <a href="https://github.com/Malakinho/tivimate-epg/actions/workflows/update.yml" target="_blank" rel="noopener noreferrer">GitHub-Aktualisierungen ansehen</a>.</span>
+    </div>
+  </main>
+</div>
+<script>
+(function () {
+  "use strict";
+  const $ = function(id){return document.getElementById(id)};
+  const format = new Intl.NumberFormat("de-DE");
+  const epgUrl = new URL("epg.xml.gz",location.href).href;
+  const names = ["Sendername","Kategorie","Kategorie-ID","Anbieter-EPG-ID","XMLTV-ID","EPG-Status","Region","Art"];
+  const statusNames = {programm:"Mit EPG",platzhalter:"Platzhalter",ohne:"Ohne EPG"};
+  const field = {name:0,cat:1,catId:2,provider:3,xml:4,status:5,region:6,kind:7};
+  let data = [],filtered = [],mode = "all",page = 0;
+  const pageSize = 80;
+  const state = $("state");
+  function setText(id,text){$(id).textContent=text}
+  function escapeCsv(text){let s=String(text==null?"":text);if(/^[\s]*[=+\-@]/.test(s))s="'"+s;return '"'+s.replace(/"/g,'""')+'"'}
+  function tag(text,klass){const n=document.createElement("span");n.className="pill "+klass;n.textContent=text;return n}
+  function cell(tr,text,klass,title){
+    const td=document.createElement("td");if(klass)td.className=klass;td.textContent=text||"–";
+    if(title)td.title=title;tr.appendChild(td);return td;
+  }
+  function render() {
+    const start=page*pageSize,end=Math.min(start+pageSize,filtered.length);
+    const body=$("tbody");body.replaceChildren();
+    if (!filtered.length) {
+      state.hidden=false;state.textContent=data.length?"Keine Sender für diese Filter gefunden.":"Keine Senderdaten vorhanden.";
+    } else {
+      state.hidden=true;
+      const frag=document.createDocumentFragment();
+      for(let i=start;i<end;i++){
+        const r=filtered[i],tr=document.createElement("tr");
+        cell(tr,r[field.name],"channel",r[field.name]);
+        cell(tr,r[field.cat],"category",r[field.cat]);
+        const st=document.createElement("td");
+        st.appendChild(tag(statusNames[r[field.status]]||"Unbekannt",r[field.status]==="programm"?"ok":r[field.status]==="platzhalter"?"placeholder":"no"));
+        tr.appendChild(st);
+        cell(tr,r[field.provider],"id",r[field.provider]);
+        cell(tr,r[field.xml],"id",r[field.xml]);
+        frag.appendChild(tr);
+      }
+      body.appendChild(frag);
+    }
+    setText("shown",format.format(filtered.length)+" Sender gefunden");
+    setText("pageSummary",filtered.length?format.format(start+1)+"–"+format.format(end)+" von "+format.format(filtered.length):"Keine Einträge");
+    setText("pageLabel",filtered.length?(page+1)+" / "+Math.ceil(filtered.length/pageSize):"0 / 0");
+    $("prev").disabled=page<=0;$("next").disabled=end>=filtered.length;
+  }
+  function apply() {
+    const search=$("search").value.toLocaleLowerCase("de").trim(),
+      cat=$("category").value,region=$("region").value,status=$("status").value;
+    filtered=data.filter(function(r){
+      const st=r[field.status],kind=r[field.kind];
+      if(mode==="programm"&&st!=="programm")return false;
+      if(mode==="platzhalter"&&st!=="platzhalter")return false;
+      if(mode==="ohne"&&st!=="ohne")return false;
+      if(mode==="ppv"&&kind!=="PPV")return false;
+      if(mode==="247"&&kind!=="24/7")return false;
+      if(cat&&r[field.catId]!==cat)return false;
+      if(region&&r[field.region]!==region)return false;
+      if(status&&st!==status)return false;
+      if(search&&![r[0],r[1],r[2],r[3],r[4]].some(function(v){return String(v).toLocaleLowerCase("de").includes(search)}))return false;
+      return true;
+    });
+    page=0;render();
+  }
+  function selectMode(newMode){
+    mode=newMode;document.querySelectorAll(".navitem").forEach(function(x){x.classList.toggle("active",x.dataset.mode===newMode)});
+    setText("sectionTitle",({all:"Alle Sender",programm:"Sender mit EPG",ohne:"Sender ohne EPG",platzhalter:"EPG-Platzhalter",ppv:"PPV-Sender",247:"24/7-Sender"})[newMode]);
+    apply();
+  }
+  function exportCsv(){
+    if(!filtered.length)return;
+    const out=[names.map(escapeCsv).join(";")];
+    for(const row of filtered)out.push(row.map(escapeCsv).join(";"));
+    const blob=new Blob(["\ufeff",out.join("\r\n")],{type:"text/csv;charset=utf-8"});
+    const url=URL.createObjectURL(blob),a=document.createElement("a");
+    a.href=url;a.download="epg-senderliste-"+mode+"-"+new Date().toISOString().slice(0,10)+".csv";
+    document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(url)},2000);
+  }
+  async function copyUrl(){
+    try {
+      if(navigator.clipboard&&window.isSecureContext)await navigator.clipboard.writeText(epgUrl);
+      else {const ta=document.createElement("textarea");ta.value=epgUrl;document.body.appendChild(ta);ta.select();document.execCommand("copy");ta.remove()}
+      const btn=$("copyUrl");btn.textContent="✓ Link kopiert";setTimeout(function(){btn.textContent="⧉ EPG-Link kopieren"},1800);
+    } catch (_) {window.prompt("EPG-URL kopieren:",epgUrl)}
+  }
+  function populateCategories(){
+    const counts=new Map();
+    for(const r of data){const key=r[field.catId];const obj=counts.get(key)||{name:r[field.cat],n:0};obj.n++;counts.set(key,obj)}
+    const select=$("category");const sorted=[...counts].sort(function(a,b){return a[1].name.localeCompare(b[1].name,"de")});
+    for(const pair of sorted){const op=document.createElement("option");op.value=pair[0];op.textContent=pair[1].name+" ("+format.format(pair[1].n)+")";select.appendChild(op)}
+  }
+  function init(payload){
+    if(!payload||!Array.isArray(payload.rows))throw Error("Ungültiges Datenformat");
+    data=payload.rows;
+    const counts=payload.counts||{},yes=counts.programm||0,place=counts.platzhalter||0,no=counts.ohne||0,total=data.length||1;
+    setText("total",format.format(data.length));setText("ok",format.format(yes));
+    setText("placeholder",format.format(place));setText("missing",format.format(no));
+    setText("navTotal",format.format(data.length));setText("navOk",format.format(yes));
+    setText("navPlace",format.format(place));setText("navNo",format.format(no));
+    $("barOk").style.width=(yes/total*100)+"%";$("barPlace").style.width=(place/total*100)+"%";$("barNo").style.width=(no/total*100)+"%";
+    const d=new Date(payload.generated_at);
+    const stamp=Number.isNaN(d.getTime())?"–":new Intl.DateTimeFormat("de-DE",{dateStyle:"medium",timeStyle:"short",timeZone:"Europe/Berlin"}).format(d);
+    setText("sideUpdated","Datenstand: "+stamp);
+    setText("lastUpdated","EPG-Daten: "+stamp+" Uhr");
+    populateCategories();apply();
+  }
+  document.querySelectorAll(".navitem").forEach(function(b){b.addEventListener("click",function(){selectMode(b.dataset.mode)})});
+  ["search","category","region","status"].forEach(function(id){$(id).addEventListener(id==="search"?"input":"change",apply)});
+  $("next").addEventListener("click",function(){if((page+1)*pageSize<filtered.length){page++;render()}});
+  $("prev").addEventListener("click",function(){if(page>0){page--;render()}});
+  $("copyUrl").addEventListener("click",copyUrl);
+  $("exportBtn").addEventListener("click",exportCsv);
+  fetch("dashboard.json",{cache:"no-store"}).then(function(r){if(!r.ok)throw Error("HTTP "+r.status);return r.json()}).then(init).catch(function(){
+    state.hidden=false;state.textContent="Senderdaten konnten nicht geladen werden. Bitte Seite neu laden.";
+    setText("shown","Fehler beim Datenabruf");
+  });
+})();
+</script>
+</body>
+</html>
