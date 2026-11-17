@@ -17,7 +17,7 @@ PPV = re.compile(r"\bPPV\b", re.I)
 def make_dashboard(*, inventory_path: Path, output_path: Path, ppv_rows,
                    always_on_rows, by_id, by_name, aliases, feeds,
                    clean_name, market_of, best, id_valid, live_ppv: bool,
-                   provider_fallback_ids=None):
+                   provider_fallback_ids=None, manual_approvals=None):
     """Data is informational; a source match does not guarantee player assignment."""
     with inventory_path.open(encoding="utf-8-sig", newline="") as handle:
         inventory = list(csv.DictReader(handle))
@@ -44,9 +44,16 @@ def make_dashboard(*, inventory_path: Path, output_path: Path, ppv_rows,
     rows = []
     counters = Counter()
     provider_fallback_ids = provider_fallback_ids or {}
+    manual_approvals = manual_approvals or []
+    approved = {(item["name"], str(item["category_id"]), item["provider_id"].casefold())
+                for item in manual_approvals}
+    # These IDs have actual programmes in the merged XMLTV output.
+    available_ids = set(by_id) | {x.casefold() for x in aliases} | set(provider_fallback_ids)
 
     def add(name, category, category_id, user_id, epg_id, status, region, kind):
-        rows.append([name, category, category_id, user_id, epg_id, status, region, kind])
+        claimable = (status in ("ohne", "pruefen") and id_valid(user_id)
+                     and user_id.casefold() in available_ids and bool(category_id))
+        rows.append([name, category, category_id, user_id, epg_id, status, region, kind, claimable])
         counters[status] += 1
 
     for rec in inventory:
@@ -75,6 +82,13 @@ def make_dashboard(*, inventory_path: Path, output_path: Path, ppv_rows,
             continue
 
         norm = clean_name(name)
+        # A prior decision confirmed by the GitHub repository owner is applied
+        # only when the same channel/category/provider ID still exists and
+        # that ID currently has real programme data.
+        if ((name, category_id, provider_id.casefold()) in approved
+                and id_valid(provider_id) and provider_id.casefold() in available_ids):
+            add(name, cat, category_id, provider_id, provider_id, "programm", market, kind)
+            continue
         actual = None
         display_id = ""
         uncertain_id = ""
@@ -166,7 +180,7 @@ def make_dashboard(*, inventory_path: Path, output_path: Path, ppv_rows,
         "counts": dict(counters),
         "total": len(rows),
         "fields": ["name", "category", "category_id", "provider_id",
-                   "xmltv_id", "status", "region", "kind"],
+                   "xmltv_id", "status", "region", "kind", "claimable"],
         "rows": rows,
         "note": "Treffer beziehen sich auf unsere XMLTV-Daten, nicht auf automatische Zuordnung im IPTV-Player.",
     }
