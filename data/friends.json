@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "friends": [
+    {
+      "id": "owner",
+      "label": "Mein EPG",
+      "token": "mms3b2rvRrj2grEAPBIRMWiDZWGf_XVmq7eI9gxB",
+      "active": true
+    }
+  ]
+}
