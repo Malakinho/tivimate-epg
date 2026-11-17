@@ -37,9 +37,9 @@ def make_dashboard(*, inventory_path: Path, output_path: Path, ppv_rows,
     # Whitelist is limited to checked discrepancies in the
     # provider-ID-present / XMLTV-ID-empty cohort. Other channels are untouched.
     verified_alias_patterns = {
-        "skycinemapremieren.de": (r"\\bSKY CINEMA PREMIEREN\\b", "SKY CINEMA PREMIERE"),
-        "ard.de": (r"\\bDAS ERSTE\\b", "DAS ERSTE"),
-        "novasportsextra.gr": (r"\\b(?:NOVASPORTS EXTRA 1|NOVA EXTRA SPORTS 1)\\b", "NOVASPORTS EXTRA 1"),
+        "skycinemapremieren.de": (r"\bSKY CINEMA PREMIEREN\b", "SKY CINEMA PREMIERE"),
+        "ard.de": (r"\bDAS ERSTE\b", "DAS ERSTE"),
+        "novasportsextra.gr": (r"\b(?:NOVASPORTS EXTRA 1|NOVA EXTRA SPORTS 1)\b", "NOVASPORTS EXTRA 1"),
     }
     rows = []
     counters = Counter()
@@ -107,6 +107,16 @@ def make_dashboard(*, inventory_path: Path, output_path: Path, ppv_rows,
                     # A real XMLTV source ID exists, but it may not match IPTV's ID.
                     display_id = named.id
 
+        # A narrow correction for verified variants whose provider ID has
+        # real XMLTV programmes, but the strict dashboard overlap rejected.
+        # This does not modify channels without a provider ID.
+        if actual is None and id_valid(provider_id):
+            rule = verified_alias_patterns.get(provider_id.casefold())
+            direct_channel = by_id.get(provider_id.casefold())
+            if (rule and direct_channel and re.search(rule[0], norm)
+                    and any(rule[1] in n for n in direct_channel.norm_names)):
+                actual = direct_channel
+                display_id = provider_id
         if actual is not None:
             add(name, cat, category_id, provider_id, display_id,
                 "programm", market, kind)
