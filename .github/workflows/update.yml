@@ -2,11 +2,12 @@ name: EPG automatisch aktualisieren
 
 on:
   schedule:
-    - cron: '24 4,16 * * *'
+    - cron: '24 */2 * * *'
   workflow_dispatch:
   push:
     paths:
       - 'build.py'
+      - 'xtream_ppv.py'
       - 'data/**'
       - '.github/workflows/update.yml'
 
@@ -33,6 +34,8 @@ jobs:
         with:
           python-version: '3.12'
       - name: XMLTV aus DE und GR erzeugen
+        env:
+          XTREAM_M3U_URL: ${{ secrets.XTREAM_M3U_URL }}
         run: python build.py
       - name: GitHub Pages konfigurieren
         uses: actions/configure-pages@v5
