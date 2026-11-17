@@ -101,13 +101,19 @@ def validate_claim():
     found = False
     with gzip.GzipFile(fileobj=io.BytesIO(file_bytes)) as guidefile:
         # Bounded streaming parse: stop as soon as actual programme seen.
-        parser = ET.iterparse(guidefile, events=("end",))
-        for _, elem in parser:
-            if elem.tag == "programme" and (elem.get("channel") or "").casefold() == wanted:
-                if elem.find("title") is not None:
+        parser = ET.iterparse(guidefile, events=("start", "end"))
+        root = None
+        for event, elem in parser:
+            if event == "start" and root is None:
+                root = elem
+            elif event == "end" and elem.tag == "programme":
+                if (elem.get("channel") or "").casefold() == wanted and elem.find("title") is not None:
                     found = True
                     break
-            elem.clear()
+                if root is not None:
+                    root.clear()
+            elif event == "end" and elem.tag == "channel" and root is not None:
+                root.clear()
     if not found:
         raise ValueError("Unter dieser Anbieter-ID enthält unsere aktuelle EPG keine Programmdaten. Die ID kann nicht einfach übernommen werden.")
     return fields
