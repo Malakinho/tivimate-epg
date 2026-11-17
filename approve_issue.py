@@ -92,7 +92,14 @@ def validate_claim():
 
     # Validate programmes, not just <channel id="..."/> metadata.
     # The guide is public and downloaded without any provider secret.
-    guide = "https://" + REPO.split("/")[0].lower() + ".github.io/" + REPO.split("/")[1] + "/epg.xml.gz"
+    # The shared legacy URL is intentionally unavailable.
+    # Validate using an existing active personal EPG URL.
+    registry = json.loads(Path("data/friends.json").read_text(encoding="utf-8"))
+    active = next((f for f in registry["friends"] if f.get("active")), None)
+    if active is None:
+        raise ValueError("Es ist derzeit kein persönlicher EPG-Link aktiv.")
+    guide = ("https://" + REPO.split("/")[0].lower() + ".github.io/"
+             + REPO.split("/")[1] + "/epg/" + active["token"] + "/epg.xml.gz")
     req = Request(guide, headers={"User-Agent": "EPG-Approval-Workflow"})
     with urlopen(req, timeout=120) as response:
         file_bytes = response.read(100 * 1024 * 1024 + 1)
