@@ -44,7 +44,7 @@ BAD_IDS = {"", "TS", "N/A", "NONE", "NULL", "0", "-"}
 PREFIX = re.compile(r"^(?:DE GO|DE|GR|PRIME|JOYN|WOW|SKYGO)\s*[:\-]\s*", re.I)
 QUALITY = re.compile(
     r"\b(?:RAW|HEVC|H265|H264|SD|FHD|HD|UHD|4K|8K|720P|1080P|2160P|"
-    r"50FPS|60FPS|30FPS|3840P|EON|WEB|MOBILE|MOBIL|SAT|KABEL|BACKUP|BK|LOW|HIGH|"
+    r"50FPS|60FPS|30FPS|3840P|EON|WEB|MOBILE|MOBIL|BACKUP|BK|LOW|"
     r"BITRATE|STREAM|DOLBY|HDR)\b", re.I
 )
 
@@ -71,6 +71,39 @@ def clean_name(value: str) -> str:
         lambda m: "NOVASPORTS " + m.group(1), value
     )
     value = value.replace("NOVASPORTS PREMIERE LEAGUE", "NOVASPORTS PREMIER LEAGUE")
+    # Known spelling and typography variants for the very same channels.
+    # Preserve distinct sports channel numbers: never fuzzy-match them.
+    value = re.sub(r"\bRTL\s+UP\b", "RTLUP", value)
+    value = re.sub(r"\bVOX\s+UP\b", "VOXUP", value)
+    value = re.sub(r"\bRTL\s+ZWEI\b", "RTLZWEI", value)
+    value = re.sub(r"\bBON\s+GUSTO\b", "BONGUSTO", value)
+    value = re.sub(r"\bJUKE\s+BOX\b", "JUKEBOX", value)
+    value = re.sub(r"\bKABEL\s+1\b", "KABEL EINS", value)
+    value = re.sub(r"\bMY\s+TEAM\s+TV\b", "MYTEAMTV", value)
+    value = re.sub(r"\bRED\s+BULL\s+TV\b", "REDBULLTV", value)
+    value = re.sub(r"\bEDGE\s+SPORT\b", "EDGESPORT", value)
+    value = re.sub(r"\bMAGENTA MUSIC\b", "MAGENTA MUSIK", value)
+    value = re.sub(r"\bHIGH\s+TV\b", "HIGHTV", value)
+    value = re.sub(r"\bRISE\s+TV\b", "RISETV", value)
+    value = re.sub(r"\bDELTA\s+TV\b", "DELTATV", value)
+    value = re.sub(r"\bTV\s+100(?:\s+SKG)?\b", "TV100", value)
+    value = re.sub(r"\bNOVA\s*LIFE\b", "NOVALIFE", value)
+    value = re.sub(r"\bEPIRUS\s+TV\s+1\b", "EPIRUSTV1", value)
+    value = re.sub(r"\bPANIK\s+TV\b", "PANIKTV", value)
+    value = re.sub(r"\bSTART\s+TV\b", "STARTTV", value)
+    value = re.sub(r"\bCORFU\s+TV\b", "CORFUTV", value)
+    value = re.sub(r"\bGNOMI\s+TV\b", "GNOMITV", value)
+    value = re.sub(r"\bDION\s+TV\b", "DIONTV", value)
+    value = re.sub(r"\bEURO\s+TV\b", "EUROTV", value)
+    value = re.sub(r"\bART\s+TV\b", "ARTTV", value)
+    value = re.sub(r"\bEXTRA\s+CHANNEL\b", "EXTRACHANNEL", value)
+    value = re.sub(r"\bNAFTEMPORIKI\s+TV\b", "NAFTEMPORIKITV", value)
+    value = re.sub(r"\bSYROS\s+TV1\b", "SYROSTV1", value)
+    value = re.sub(r"\bSAMIAKI\s+TV\b", "SAMIAKITV", value)
+    value = re.sub(r"\bIDJ\s+KIDS\b", "IDJKIDS", value)
+    value = re.sub(r"\bNOVACINEMA\s+([1-4])\b", r"NOVACINEMA\1", value)
+    value = re.sub(r"\bANT1\s+COMMEDY\b", "ANT1 COMEDY", value)
+    value = re.sub(r"\bERT\s+NEWS\b", "ERTNEWS", value)
     return value
 
 
