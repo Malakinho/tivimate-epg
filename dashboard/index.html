@@ -345,8 +345,8 @@
       status.textContent=f.active?"● Aktiv":"● Gesperrt";
       head.append(name,status);
       const link=document.createElement("div");link.className="friend-link";
-      link.title=f.active?new URL(f.path,location.href).href:"Gesperrt – kein aktiver EPG-Link";
-      link.textContent=f.active?new URL(f.path,location.href).href:"Link gesperrt";
+      link.title=f.active?"Über Kopieren in die Zwischenablage übernehmen":"Gesperrt – kein aktiver EPG-Link";
+      link.textContent=f.active?"Persönlicher Link – zum Kopieren klicken":"Link gesperrt";
       const controls=document.createElement("div");controls.className="friend-buttons";
       if(f.active){
         controls.append(friendButton("⧉ Kopieren",()=>copyFriendLink(f.path)));
