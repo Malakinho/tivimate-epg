@@ -15,7 +15,11 @@
     .card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:22px;margin-bottom:17px}
     .stack{display:grid;gap:10px}.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
     label{display:block;font-weight:650;margin-bottom:7px}
-    input[type=file],input[type=url]{display:block;width:100%;border:1px solid var(--line);border-radius:10px;background:var(--secondary);padding:12px;color:var(--text);font:inherit}
+    input[type=file],input[type=url],input[type=text],input[type=password],select{display:block;width:100%;border:1px solid var(--line);border-radius:10px;background:var(--secondary);padding:12px;color:var(--text);font:inherit}
+    input,select{min-height:44px}
+    .field{margin-top:13px}.field:first-child{margin-top:0}.hidden-source{display:none!important}
+    .credentials{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    @media(max-width:580px){.credentials{grid-template-columns:1fr}}
     input:focus-visible,button:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
     button{border:1px solid var(--line);background:var(--secondary);color:var(--text);border-radius:10px;padding:12px 17px;font:inherit;font-weight:650;cursor:pointer}
     button.primary{background:var(--accent);color:#051b1d;border-color:var(--accent)}
@@ -33,15 +37,39 @@
 <div class="wrap">
   <header><a href="./">← Zurück zum EPG Manager</a><span class="pill">Nur für meine Playlist</span></header>
   <h1>Meine M3U mit fertiger EPG-Zuordnung</h1>
-  <p class="lead">Lade deine Original-M3U hoch. Die App übernimmt passende XMLTV-IDs aus unserer EPG, ohne Sender, Streaming-Adressen oder Zugangsdaten zu verändern.</p>
+  <p class="lead">Nutze deinen <strong>M3U-Link</strong> oder deine <strong>Xtream-Codes-Zugangsdaten</strong>. Wir ergänzen passende XMLTV-IDs, ohne die Stream-Adressen zu verändern.</p>
   <div class="note">
-    <strong>Privat auf deinem Gerät:</strong> Deine M3U wird nur im Browser gelesen und als neue Datei heruntergeladen. Sie wird nicht an GitHub oder einen anderen Server geschickt. Die Webseite selbst bleibt öffentlich.
+    <strong>Privat im Browser:</strong> Die Playlist wird direkt von deinem Anbieter abgerufen und lokal verarbeitet. Die Zugangsdaten werden nicht an GitHub übertragen oder in deiner Browser-URL gespeichert. Deine Daten werden aber an deinen IPTV-Anbieter übermittelt, um die Playlist abzurufen. Die Webseite selbst ist öffentlich.
   </div>
   <section class="card" style="margin-top:18px" aria-labelledby="step1">
-    <h2 id="step1">1. Anbieter-Playlist auswählen</h2>
-    <label for="source">Deine M3U-Datei (.m3u oder .m3u8)</label>
-    <input id="source" type="file" accept=".m3u,.m3u8,.txt,text/plain,audio/x-mpegurl">
-    <p class="hint">Du kannst deine Original-M3U beim IPTV-Anbieter herunterladen und hier auswählen. Die Datei kann vertrauliche Stream-Links enthalten.</p>
+    <h2 id="step1">1. Playlist über Link oder Xtream Codes einlesen</h2>
+    <label for="sourceMode">Wie bekommst du deine Sender?</label>
+    <select id="sourceMode">
+      <option value="m3u">M3U-Link (Standard)</option>
+      <option value="xtream">Xtream Codes (Server, Benutzername, Passwort)</option>
+      <option value="file">M3U-Datei (optional)</option>
+    </select>
+    <div id="sourceM3u" class="field">
+      <label for="m3uLink">Dein vollständiger M3U-Link</label>
+      <input type="url" id="m3uLink" placeholder="https://anbieter.example/get.php?username=…&amp;password=…&amp;type=m3u_plus" spellcheck="false" autocomplete="off">
+      <p class="hint">Den Link bitte nur hier eingeben, nicht im Chat oder in GitHub-Issues veröffentlichen.</p>
+    </div>
+    <div id="sourceXtream" class="field hidden-source">
+      <div class="field">
+        <label for="serverUrl">Server-Adresse</label>
+        <input type="url" id="serverUrl" placeholder="https://anbieter.example:8080" spellcheck="false" autocomplete="off">
+      </div>
+      <div class="credentials">
+        <div class="field"><label for="username">Benutzername</label><input type="text" id="username" autocomplete="off" spellcheck="false"></div>
+        <div class="field"><label for="password">Passwort</label><input type="password" id="password" autocomplete="off" spellcheck="false"></div>
+      </div>
+      <p class="hint">Wir erzeugen daraus den üblichen Xtream-M3U-Abruf über <code>get.php?type=m3u_plus</code>. Deine Zugangsdaten bleiben auf diesem Gerät und werden nur beim Anbieterabruf verwendet.</p>
+    </div>
+    <div id="sourceFile" class="field hidden-source">
+      <label for="source">M3U-Datei auswählen</label>
+      <input id="source" type="file" accept=".m3u,.m3u8,.txt,text/plain,audio/x-mpegurl">
+    </div>
+    <p class="hint">Wichtig: Manche Anbieter erlauben den Abruf über einen IPTV-Player, aber <strong>nicht direkt über Webseiten</strong> (CORS-Sperre). Ebenso blockieren HTTPS-Webseiten oft unverschlüsselte HTTP-Anbieterlinks. In diesen Fällen kann GitHub Pages den Link nicht selbst laden.</p>
   </section>
   <section class="card" aria-labelledby="step2">
     <h2 id="step2">2. Meine EPG-Adresse</h2>
@@ -50,7 +78,7 @@
     <p id="epgHint" class="hint">Dein aktiver Link „Mein EPG“ wird automatisch eingesetzt. Du kannst ihn bei Bedarf ändern.</p>
   </section>
   <section class="card" aria-labelledby="step3">
-    <h2 id="step3">3. EPG-IDs eintragen und M3U herunterladen</h2>
+    <h2 id="step3">3. EPG-IDs eintragen und fertige M3U herunterladen</h2>
     <div class="row">
       <button id="generate" class="primary" type="button" disabled>EPG-Zuordnung erstellen</button>
       <button id="clear" type="button">Zurücksetzen</button>
@@ -63,7 +91,7 @@
     </div>
     <p class="hint">Nur eindeutige Treffer werden übernommen. Zweifelhafte, nicht vorhandene und fehlende EPG-IDs bleiben unverändert. Die M3U erhält im Kopf die persönliche XMLTV-URL für unterstützte Player.</p>
   </section>
-  <p class="hint">Diese Funktion erzeugt eine <strong>herunterladbare Datei</strong>, keinen dauerhaften öffentlichen M3U-Link. Das schützt die Stream-Adressen vor einer Veröffentlichung auf GitHub Pages. Manche iMPlayer-Versionen benötigen zusätzlich eine manuell eingetragene XMLTV-URL.</p>
+  <p class="hint"><strong>Ausgabe:</strong> Eine neue M3U-Datei zum Importieren in iMPlayer. Einen ständig erreichbaren eigenen M3U-Link können wir auf öffentlichen GitHub Pages nicht sicher veröffentlichen, weil deine persönlichen Stream-URLs und Xtream-Zugangsdaten darin stehen könnten. Je nach iMPlayer-Version musst du die XMLTV-Adresse zusätzlich einmal als EPG-Quelle eintragen.</p>
 </div>
 <script>
 (function(){
@@ -181,15 +209,88 @@
       }
       state.ready=true;
       $("generate").disabled=false;
-      message("EPG-Katalog geladen. Du kannst deine M3U-Datei jetzt umwandeln.");
+      message("EPG-Katalog geladen. M3U-Link oder Xtream Codes eingeben und Playlist erstellen.");
     }catch(err){
       message("EPG-Daten konnten nicht geladen werden. Bitte Seite neu öffnen.",true);
     }
   }
+  function chooseMode(){
+    const mode=$("sourceMode").value;
+    $("sourceM3u").classList.toggle("hidden-source",mode!=="m3u");
+    $("sourceXtream").classList.toggle("hidden-source",mode!=="xtream");
+    $("sourceFile").classList.toggle("hidden-source",mode!=="file");
+    $("results").classList.add("hidden");
+    message("EPG-Katalog geladen. Wähle deine Zugangsart und erstelle die Playlist.");
+  }
+  function providerLink(){
+    const mode=$("sourceMode").value;
+    const raw=mode==="m3u"?$("m3uLink").value.trim():$("serverUrl").value.trim();
+    if(!raw)throw Error(mode==="m3u"?"Bitte deinen M3U-Link einfügen.":"Bitte die Xtream-Serveradresse eingeben.");
+    let url;
+    try{url=new URL(raw);}catch(_){throw Error("Bitte eine vollständige Anbieteradresse mit http:// oder https:// eingeben.");}
+    if(!["https:","http:"].includes(url.protocol)||!url.hostname||
+      url.username||url.password)throw Error("Ungültige Anbieteradresse.");
+    if(mode==="xtream"){
+      const username=$("username").value.trim(),password=$("password").value;
+      if(!username||!password)throw Error("Bitte Xtream-Benutzername und Passwort eingeben.");
+      // Support server root URLs and directories (e.g. /iptv/).
+      const base=url.pathname.endsWith("/")?url:new URL(url.pathname+"/",url);
+      url=new URL("get.php",base);
+      url.searchParams.set("username",username);
+      url.searchParams.set("password",password);
+      url.searchParams.set("type","m3u_plus");
+      url.searchParams.set("output","ts");
+    }
+    if(url.protocol==="http:"&&location.protocol==="https:")
+      throw Error("Dein Anbieter verwendet HTTP. GitHub Pages ist HTTPS und kann diesen Link meist nicht abrufen (Mixed Content). Verwende einen HTTPS-Anbieterlink oder die optionale Dateieinfuhr.");
+    return url.href;
+  }
+  async function fetchPlaylist(url){
+    // Do not proxy, store or log private credentials.
+    const timeout=new AbortController();
+    const timer=setTimeout(()=>timeout.abort(),90000);
+    try {
+      const resp=await fetch(url,{mode:"cors",credentials:"omit",cache:"no-store",signal:timeout.signal});
+      if(!resp.ok)throw Error("Anbieter antwortet mit HTTP "+resp.status+". Prüfe den Link bzw. deine Zugangsdaten.");
+      const max=80*1024*1024;
+      const size=Number(resp.headers.get("content-length"));
+      if(size>max)throw Error("Die Anbieter-Playlist ist größer als 80 MB.");
+      if(!resp.body){
+        const text=await resp.text();
+        if(text.length>max)throw Error("Die Playlist ist größer als 80 MB.");
+        return text;
+      }
+      const reader=resp.body.getReader();
+      const decoder=new TextDecoder();
+      let text="",bytes=0;
+      while(true){
+        const {value,done}=await reader.read();
+        if(done)break;
+        bytes+=value.byteLength;
+        if(bytes>max){await reader.cancel();throw Error("Die Playlist ist größer als 80 MB.");}
+        text+=decoder.decode(value,{stream:true});
+      }
+      return text+decoder.decode();
+    } catch(err){
+      if(err.name==="TypeError")
+        throw Error("Dein Anbieter verhindert vermutlich den Abruf durch Webseiten (CORS) oder der Link leitet auf HTTP um. Über GitHub Pages lässt sich diese Sperre nicht umgehen. Nutze alternativ die vom Anbieter heruntergeladene M3U-Datei.");
+      if(err.name==="AbortError")
+        throw Error("Der Anbieter hat innerhalb von 90 Sekunden keine vollständige Playlist geliefert.");
+      throw err;
+    } finally{clearTimeout(timer);}
+  }
+  async function readSource(){
+    if($("sourceMode").value==="file"){
+      const file=$("source").files[0];
+      if(!file)throw Error("Bitte deine M3U-Datei auswählen.");
+      if(file.size>80*1024*1024)throw Error("Die M3U-Datei ist größer als 80 MB.");
+      return file.text();
+    }
+    message("Lade die M3U direkt von deinem Anbieter …");
+    return fetchPlaylist(providerLink());
+  }
+  $("sourceMode").addEventListener("change",chooseMode);
   $("generate").addEventListener("click",async()=>{
-    const file=$("source").files[0];
-    if(!file){message("Bitte zuerst deine Anbieter-M3U-Datei auswählen.",true);return;}
-    if(file.size>80*1024*1024){message("Die M3U-Datei ist größer als 80 MB.",true);return;}
     let epg;
     try{
       epg=new URL($("epgUrl").value.trim());
@@ -199,8 +300,8 @@
     }catch(err){message("Bitte eine gültige HTTPS-Adresse deiner EPG eintragen.",true);return;}
     $("generate").disabled=true;
     try{
-      const source=await file.text();
-      if(!source.includes("#EXTINF:"))throw Error("Die Datei enthält keine M3U-Sender (#EXTINF).");
+      const source=await readSource();
+      if(!source.includes("#EXTINF:"))throw Error("Der Anbieter liefert keine gültige M3U-Playlist mit Sendern (#EXTINF). Bitte Link und Xtream-Zugang prüfen.");
       const patched=fixPlaylist(source,index,epg.href);
       const blob=new Blob(["\ufeff",patched.output],{type:"audio/x-mpegurl;charset=utf-8"});
       const href=URL.createObjectURL(blob);
@@ -217,9 +318,14 @@
   });
   $("clear").addEventListener("click",()=>{
     $("source").value="";
+    $("m3uLink").value="";
+    $("serverUrl").value="";
+    $("username").value="";
+    $("password").value="";
     $("results").classList.add("hidden");
-    message("Bereit für deine nächste M3U-Datei.");
+    message("Bereit. Bitte M3U-Link oder Xtream Codes eingeben.");
   });
+  chooseMode();
   prepare();
 })();
 </script>
