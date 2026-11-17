@@ -118,6 +118,24 @@ def clean_name(value: str) -> str:
     value = re.sub(r"\bNOVACINEMA\s+([1-4])\b", r"NOVACINEMA\1", value)
     value = re.sub(r"\bANT1\s+COMMEDY\b", "ANT1 COMEDY", value)
     value = re.sub(r"\bERT\s+NEWS\b", "ERTNEWS", value)
+    # Narrow confirmed spelling variants; do not generalize sports numbering.
+    value = re.sub(r"^NTRO$", "NITRO", value)
+    value = re.sub(r"^RTL NITRO$", "NITRO", value)
+    value = re.sub(r"^SPORT 1$", "SPORT1", value)
+    value = re.sub(r"^QVC (?:2|ZWEI)$", "QVC2", value)
+    value = re.sub(r"^E ENTERTAINM$", "E ENTERTAINMENT", value)
+    value = re.sub(r"^AUTO MOTOR SPORT CHANNEL$", "AUTO MOTOR SPORT", value)
+    value = re.sub(r"^MY\s*ZEN TV$", "MYZEN TV", value)
+    value = re.sub(r"^(?:ATTICA|ATTICA TV|ATTICATV)$", "ATTICATV", value)
+    value = re.sub(r"^(?:AXELWOS|AXELWOSTV)$", "AXELWOSTV", value)
+    value = re.sub(r"^(?:TV100 SKG|TV100)$", "TV100", value)
+    value = re.sub(r"^(?:MEGA CHANNEL|MEGA)$", "MEGA", value)
+    value = re.sub(r"^(?:BEST TV|BESTTV)$", "BESTTV", value)
+    value = re.sub(r"^(?:ONE TV|ONETV)$", "ONETV", value)
+    value = re.sub(r"^(?:OPEN BEYOND TV|OPEN BEYOND|OPENBEYOND)$", "OPENBEYOND", value)
+    value = re.sub(r"^ERT SPORTS ([23])$", r"ERTSPORTS\1", value)
+    value = re.sub(r"^NOVASPORTS (START|PREMIER LEAGUE) SAT$", r"NOVASPORTS \1", value)
+    value = re.sub(r"^CRIME\s*\+\s*INVESTIGATION$", "CRIME INVESTIGATION", value)
     return value
 
 
