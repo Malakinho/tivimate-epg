@@ -79,7 +79,7 @@ def make_dashboard(*, inventory_path: Path, output_path: Path, ppv_rows,
             add(name, cat, category_id, provider_id, by_ppv_static[name],
                 "platzhalter", market, kind)
             continue
-        if is_always:
+        if is_always and name in by_always:
             add(name, cat, category_id, provider_id, by_always[name],
                 "platzhalter", market, kind)
             continue
