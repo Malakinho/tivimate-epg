@@ -27,6 +27,7 @@ from urllib.request import Request, urlopen
 from xml.etree import ElementTree as ET
 
 from xtream_ppv import current_ppv_rows
+from dashboard_data import make_dashboard
 
 ROOT = Path(__file__).resolve().parent
 DATA = ROOT / "data" / "channels.csv"
@@ -453,6 +454,17 @@ def build() -> dict:
             "match_statistics": dict(metrics),
             "limitations": "Missing or conflicting tvg-id in the provider playlist can require manual TiviMate assignment. Programmes depend on the upstream providers.",
         }
+        dashboard = make_dashboard(
+            inventory_path=ROOT / "data" / "inventory.csv",
+            output_path=OUT_DIR / "dashboard.json",
+            ppv_rows=ppv_rows,
+            always_on_rows=always_on_rows,
+            by_id=by_id, by_name=by_name, aliases=aliases, feeds=feeds,
+            clean_name=clean_name, market_of=market_of, best=best, id_valid=id_valid,
+            live_ppv=bool(xtream_url),
+        )
+        result["dashboard_channels"] = dashboard["total"]
+        result["dashboard_counts"] = dashboard["counts"]
         (OUT_DIR / "status.json").write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
         logging.info("DONE: %s channels + %s aliases, %s programme entries, %s bytes", len(by_id), len(aliases), total_programmes, (OUT_DIR / 'epg.xml.gz').stat().st_size)
         return result
