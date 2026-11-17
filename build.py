@@ -13,6 +13,7 @@ import hashlib
 import io
 import json
 import logging
+import os
 import re
 import sys
 import tempfile
@@ -24,6 +25,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from urllib.request import Request, urlopen
 from xml.etree import ElementTree as ET
+
+from xtream_ppv import current_ppv_rows
 
 ROOT = Path(__file__).resolve().parent
 DATA = ROOT / "data" / "channels.csv"
@@ -220,8 +223,17 @@ def build() -> dict:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     with DATA.open("r", encoding="utf-8-sig", newline="") as csvfile:
         input_rows = list(csv.DictReader(csvfile))
-    with PPV_DATA.open("r", encoding="utf-8-sig", newline="") as csvfile:
-        ppv_rows = list(csv.DictReader(csvfile))
+    xtream_url = os.environ.get("XTREAM_M3U_URL", "").strip()
+    if xtream_url:
+        # Live channel names always override the static PPV export.
+        # On API failure the build stops, leaving the last published EPG online.
+        ppv_rows = current_ppv_rows(xtream_url)
+        logging.info("Live PPV names retrieved: %s channels", len(ppv_rows))
+    else:
+        # Until the user enters the GitHub secret, keep the working static guide.
+        with PPV_DATA.open("r", encoding="utf-8-sig", newline="") as csvfile:
+            ppv_rows = list(csv.DictReader(csvfile))
+        logging.info("Using static PPV fallback: configure XTREAM_M3U_URL secret for live updates")
     # PPV placeholders remain unchanged. 24/7 entries are only added
     # where the provider supplied no EPG ID.
     with ALWAYS_ON_DATA.open("r", encoding="utf-8-sig", newline="") as csvfile:
@@ -436,6 +448,7 @@ def build() -> dict:
             "programme_entries": total_programmes,
             "input_channels": len(input_rows),
             "ppv_placeholder_channels": len(ppv_rows),
+            "ppv_name_source": "live_xtream" if xtream_url else "static_export",
             "always_on_placeholder_channels": len(always_on_rows),
             "match_statistics": dict(metrics),
             "limitations": "Missing or conflicting tvg-id in the provider playlist can require manual TiviMate assignment. Programmes depend on the upstream providers.",
