@@ -34,6 +34,13 @@ def make_dashboard(*, inventory_path: Path, output_path: Path, ppv_rows,
     by_ppv_static = {(r.get("name") or "").strip(): r.get("id") or ""
                      for r in ppv_rows}
     alias_keys = {a.casefold(): a for a in aliases}
+    # Whitelist is limited to checked discrepancies in the
+    # provider-ID-present / XMLTV-ID-empty cohort. Other channels are untouched.
+    verified_alias_patterns = {
+        "skycinemapremieren.de": (r"\\bSKY CINEMA PREMIEREN\\b", "SKY CINEMA PREMIERE"),
+        "ard.de": (r"\\bDAS ERSTE\\b", "DAS ERSTE"),
+        "novasportsextra.gr": (r"\\b(?:NOVASPORTS EXTRA 1|NOVA EXTRA SPORTS 1)\\b", "NOVASPORTS EXTRA 1"),
+    }
     rows = []
     counters = Counter()
     provider_fallback_ids = provider_fallback_ids or {}
@@ -109,6 +116,22 @@ def make_dashboard(*, inventory_path: Path, output_path: Path, ppv_rows,
             add(name, cat, category_id, provider_id,
                 provider_fallback_ids[provider_id.casefold()],
                 "programm", market, kind)
+        elif id_valid(provider_id) and provider_id.casefold() in alias_keys:
+            # This provider EPG-ID already has programmes in our published
+            # XMLTV, but the dashboard was only checking source IDs.
+            alias_id = alias_keys[provider_id.casefold()]
+            linked = aliases[alias_id]
+            rule = verified_alias_patterns.get(provider_id.casefold())
+            if (rule and re.search(rule[0], norm)
+                    and any(rule[1] in n for n in linked.norm_names)):
+                add(name, cat, category_id, provider_id, alias_id,
+                    "programm", market, kind)
+            else:
+                # XMLTV exists under the ID, but could be another channel
+                # (such as 01TV.fr or an incorrectly mapped UK stream).
+                # Leave XMLTV ID blank until verified.
+                add(name, cat, category_id, provider_id, "",
+                    "pruefen", market, kind)
         elif uncertain_id:
             # The ID has a published schedule, but the source title is at odds
             # with the channel name. Flag it instead of calling it missing.
