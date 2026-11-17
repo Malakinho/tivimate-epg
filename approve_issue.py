@@ -41,7 +41,8 @@ def api(path, method="GET", data=None):
         },
     )
     with urlopen(req, timeout=60) as response:
-        return json.load(response)
+        payload = response.read()
+        return json.loads(payload) if payload else {}
 
 
 def comment(message):
@@ -146,6 +147,10 @@ if __name__ == "__main__":
     try:
         claim = validate_claim()
         changed = store(claim)
+        if changed:
+            # GITHUB_TOKEN pushes do not trigger push-based workflows.
+            # workflow_dispatch explicitly triggers a new EPG publication.
+            api("/actions/workflows/update.yml/dispatches", "POST", {"ref": "main"})
         message = (
             "✅ **EPG-ID freigegeben.** Die nächste GitHub-Pages-Veröffentlichung übernimmt "
             "die bestätigte Anbieter-ID in der Webapp. Der EPG-Link bleibt gleich."
