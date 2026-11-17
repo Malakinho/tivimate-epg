@@ -15,6 +15,7 @@ import json
 import logging
 import os
 import re
+import shutil
 import sys
 import tempfile
 import time
@@ -465,6 +466,7 @@ def build() -> dict:
         )
         result["dashboard_channels"] = dashboard["total"]
         result["dashboard_counts"] = dashboard["counts"]
+        shutil.copyfile(ROOT / "dashboard" / "index.html", OUT_DIR / "index.html")
         (OUT_DIR / "status.json").write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
         logging.info("DONE: %s channels + %s aliases, %s programme entries, %s bytes", len(by_id), len(aliases), total_programmes, (OUT_DIR / 'epg.xml.gz').stat().st_size)
         return result
