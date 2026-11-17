@@ -29,6 +29,7 @@ from xml.etree import ElementTree as ET
 
 from xtream_ppv import current_ppv_rows
 from dashboard_data import make_dashboard
+from provider_epg import fetch_provider_xmltv, provider_coverage, emit_provider_programmes
 
 ROOT = Path(__file__).resolve().parent
 DATA = ROOT / "data" / "channels.csv"
@@ -360,6 +361,32 @@ def build() -> dict:
         for ch in by_id.values():
             chosen_from_feed[ch.feed].add(ch.id)
 
+        # Only fallback for valid playlist EPG IDs that are not yet served
+        # by a real, selected public programme source. Do not overwrite.
+        with (ROOT / "data" / "inventory.csv").open("r", encoding="utf-8-sig", newline="") as inv:
+            provider_ids = {row.get("epg_channel_id", "").strip() for row in csv.DictReader(inv)}
+        covered_ids = set(by_id) | {aid.casefold() for aid in aliases}
+        wanted_ids = {p.casefold() for p in provider_ids if id_valid(p) and p.casefold() not in covered_ids}
+        provider_path = None
+        provider_fallback_ids = {}
+        provider_counts = Counter()
+        if xtream_url and wanted_ids:
+            try:
+                provider_path = fetch_provider_xmltv(xtream_url, temp_dir)
+                provider_canonical, provider_counts = provider_coverage(provider_path, wanted_ids)
+                provider_fallback_ids = {
+                    key: provider_canonical[key]
+                    for key in wanted_ids
+                    if provider_counts.get(key, 0) > 0 and key in provider_canonical
+                }
+                logging.info("Provider XMLTV fallback: %d eligible IDs with schedules", len(provider_fallback_ids))
+            except Exception as error:
+                # The provider XMLTV URL may not exist or be authorized.
+                # Keep working public EPG sources and PPV placeholders.
+                logging.warning("Provider XMLTV fallback skipped: %s", type(error).__name__)
+                provider_path = None
+                provider_fallback_ids = {}
+
         temporary_out = OUT_DIR / "epg.xml.gz.tmp"
         total_programmes = 0
         with temporary_out.open("wb") as raw:
@@ -380,6 +407,12 @@ def build() -> dict:
                         elt.append(copy.deepcopy(icon))
                     zipout.write(ET.tostring(elt, encoding="utf-8"))
                     zipout.write(b"\n")
+                # Every provider fallback ID is the same ID already present
+                # in the user's playlist, so clients can match it directly.
+                for key, cid in sorted(provider_fallback_ids.items()):
+                    ch = ET.Element("channel", {"id": cid})
+                    ET.SubElement(ch, "display-name").text = cid
+                    zipout.write(ET.tostring(ch, encoding="utf-8") + b"\n")
                 # PPV placeholder channels: full provider name as EPG title.
                 # Never imply that these are real broadcast event times.
                 for item in placeholder_rows:
@@ -416,6 +449,8 @@ def build() -> dict:
                                     root.clear()
                             elif event == "end" and elem.tag == "channel" and root is not None:
                                 root.clear()
+                if provider_path and provider_fallback_ids:
+                    total_programmes += emit_provider_programmes(provider_path, zipout, provider_fallback_ids)
                 from datetime import timedelta
                 today = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
                 for item in placeholder_rows:
@@ -450,6 +485,8 @@ def build() -> dict:
             "programme_entries": total_programmes,
             "input_channels": len(input_rows),
             "ppv_placeholder_channels": len(ppv_rows),
+            "provider_fallback_channels": len(provider_fallback_ids),
+            "provider_fallback_programmes": sum(provider_counts.get(k, 0) for k in provider_fallback_ids),
             "ppv_name_source": "live_xtream" if xtream_url else "static_export",
             "always_on_placeholder_channels": len(always_on_rows),
             "match_statistics": dict(metrics),
@@ -463,6 +500,7 @@ def build() -> dict:
             by_id=by_id, by_name=by_name, aliases=aliases, feeds=feeds,
             clean_name=clean_name, market_of=market_of, best=best, id_valid=id_valid,
             live_ppv=bool(xtream_url),
+            provider_fallback_ids=provider_fallback_ids,
         )
         result["dashboard_channels"] = dashboard["total"]
         result["dashboard_counts"] = dashboard["counts"]
