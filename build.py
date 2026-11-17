@@ -107,6 +107,7 @@ def clean_name(value: str) -> str:
     value = re.sub(r"\bSYROS\s+TV1\b", "SYROSTV1", value)
     value = re.sub(r"\bSAMIAKI\s+TV\b", "SAMIAKITV", value)
     value = re.sub(r"\bIDJ\s+KIDS\b", "IDJKIDS", value)
+    value = re.sub(r"\bNOVA\s+CINEMA\s*([1-4])\b", r"NOVACINEMA\1", value)
     value = re.sub(r"\bNOVACINEMA\s+([1-4])\b", r"NOVACINEMA\1", value)
     value = re.sub(r"\bANT1\s+COMMEDY\b", "ANT1 COMEDY", value)
     value = re.sub(r"\bERT\s+NEWS\b", "ERTNEWS", value)
