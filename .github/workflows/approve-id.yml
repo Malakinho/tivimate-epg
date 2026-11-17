@@ -1,0 +1,30 @@
+name: Anbieter-EPG-ID freigeben
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: write
+  issues: write
+
+concurrency:
+  group: epg-id-approvals
+  cancel-in-progress: false
+
+jobs:
+  approve:
+    # Do not execute repository-writing code for issues submitted by other users.
+    if: ${{ github.event.issue.user.login == github.repository_owner && github.event.issue.title == 'EPG-ID übernehmen' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dateien laden
+        uses: actions/checkout@v4
+      - name: Python einrichten
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: EPG-ID prüfen und speichern
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python approve_issue.py
