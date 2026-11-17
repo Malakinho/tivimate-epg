@@ -105,7 +105,7 @@
         <label class="search-box"><span class="sr-only">Sender oder EPG-ID suchen</span><input class="control" id="search" type="search" placeholder="⌕  Sendername oder EPG-ID suchen …" autocomplete="off"></label>
         <label><span class="sr-only">Kategorie wählen</span><select class="control" id="category"><option value="">Alle Kategorien</option></select></label>
         <label><span class="sr-only">Region wählen</span><select class="control" id="region"><option value="">Alle Regionen</option><option value="DE">Deutschland</option><option value="GR">Griechenland</option><option value="DE/International">PPV – Live</option></select></label>
-        <label><span class="sr-only">Status wählen</span><select class="control" id="status"><option value="">Alle Status</option><option value="programm">Mit Programmdaten</option><option value="platzhalter">Nur Platzhalter</option><option value="ohne">Ohne EPG</option><option value="pruefen">Zuordnung prüfen</option></select></label>
+        <label><span class="sr-only">Status wählen</span><select class="control" id="status"><option value="">Alle Status</option><option value="programm">Mit Programmdaten</option><option value="platzhalter">Nur Platzhalter</option><option value="ohne">Ohne EPG</option><option value="pruefen">Zuordnung prüfen</option><option value="provider_no_xml">Anbieter-ID vorhanden, XMLTV-ID fehlt</option></select></label>
       </div>
       <div class="table-meta"><span id="shown">Lade Senderdaten …</span><span id="lastUpdated">–</span></div>
       <div class="table-wrap">
@@ -180,7 +180,10 @@
       if(mode==="247"&&kind!=="24/7")return false;
       if(cat&&r[field.catId]!==cat)return false;
       if(region&&r[field.region]!==region)return false;
-      if(status&&st!==status)return false;
+      if(status==="provider_no_xml"){
+        const pid=String(r[field.provider]||"").trim(),xid=String(r[field.xml]||"").trim();
+        if(!pid||xid||["TS","N/A","NONE","NULL","0","-"].includes(pid.toUpperCase()))return false;
+      } else if(status&&st!==status)return false;
       if(search&&![r[0],r[1],r[2],r[3],r[4]].some(function(v){return String(v).toLocaleLowerCase("de").includes(search)}))return false;
       return true;
     });
