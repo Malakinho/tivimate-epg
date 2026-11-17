@@ -28,7 +28,10 @@
     .subtitle { color:var(--muted);margin:8px 0 0;font-size:13px }
     .top-actions { display:flex;align-items:center;flex-wrap:wrap;gap:10px }
     .btn { border:1px solid var(--line);border-radius:10px;padding:10px 14px;background:var(--panel);color:var(--ink);font-weight:650;display:inline-flex;justify-content:center;align-items:center;gap:8px;min-height:40px }
-    .btn:hover { border-color:#47718c;background:#1b2e48 } .btn.primary { border:1px solid #45cfb4;background:var(--teal);color:#071a21 } .btn.primary:hover { background:#7cead6 }
+    .btn:hover { border-color:#47718c;background:#1b2e48 }
+    .claim-btn { padding:6px 10px;min-height:30px;font-size:11px;background:rgba(66,216,187,.12);color:#80f0d9;border:1px solid #397768;border-radius:8px;white-space:nowrap }
+    .claim-btn:hover { background:rgba(66,216,187,.22);border-color:#64d9c3 }
+    .claim-note { color:#7789a4;font-size:11px;white-space:nowrap } .btn.primary { border:1px solid #45cfb4;background:var(--teal);color:#071a21 } .btn.primary:hover { background:#7cead6 }
     .stats { display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-bottom:22px }
     .stat { background:var(--panel);border:1px solid var(--line);border-radius:15px;padding:19px 19px 17px;position:relative;overflow:hidden }
     .stat:before { content:"";position:absolute;top:0;left:0;right:0;height:2px;background:#415779 }
@@ -110,7 +113,7 @@
       <div class="table-meta"><span id="shown">Lade Senderdaten …</span><span id="lastUpdated">–</span></div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Sendername</th><th>Kategorie</th><th>EPG-Status</th><th>Anbieter-ID</th><th>XMLTV-ID</th></tr></thead>
+          <thead><tr><th>Sendername</th><th>Kategorie</th><th>EPG-Status</th><th>Anbieter-ID</th><th>XMLTV-ID</th><th>Aktion</th></tr></thead>
           <tbody id="tbody"></tbody>
         </table>
         <div id="state" role="status">Die Senderliste wird geladen …</div>
@@ -119,7 +122,7 @@
     </section>
     <div class="hint">
       <strong>Was bedeutet der Status?</strong> „Mit EPG“ bedeutet, dass wir passende Programmdaten in der XMLTV gefunden haben – nicht zwingend, dass TiviMate oder iMPlayer die Zuordnung automatisch vorgenommen hat. „Zuordnung prüfen“ kennzeichnet eine vorhandene EPG-ID, deren Programmsender möglicherweise nicht zum Stream passt. „Platzhalter“ zeigt bei PPV und 24/7 den Sendernamen als Programmtitel. <br>
-      <span style="display:inline-block;margin-top:5px">Die Webapp ist eine <strong>schreibgeschützte Übersicht</strong>. Deine Zugangsdaten sind nicht enthalten. Änderungen an EPG-IDs werden derzeit weiterhin über den Generator vorgenommen. <a href="https://github.com/Malakinho/tivimate-epg/actions/workflows/update.yml" target="_blank" rel="noopener noreferrer">GitHub-Aktualisierungen ansehen</a>.</span>
+      <span style="display:inline-block;margin-top:5px">Die Webseite selbst speichert keine Zugangsdaten. Du kannst eine vorhandene Anbieter-ID per <strong>„ID übernehmen“</strong> zur Freigabe auf GitHub öffnen. Nur der angemeldete <strong>Repository-Inhaber</strong> kann sie durch „Submit new issue“ dauerhaft bestätigen. Eine Übernahme wird nur angeboten, wenn unsere XMLTV unter dieser ID bereits echte Programme enthält. Die Bestätigung ist als GitHub-Issue öffentlich sichtbar. <a href="https://github.com/Malakinho/tivimate-epg/actions/workflows/update.yml" target="_blank" rel="noopener noreferrer">GitHub-Aktualisierungen ansehen</a>.</span>
     </div>
   </main>
 </div>
@@ -131,7 +134,7 @@
   const epgUrl = new URL("epg.xml.gz",location.href).href;
   const names = ["Sendername","Kategorie","Kategorie-ID","Anbieter-EPG-ID","XMLTV-ID","EPG-Status","Region","Art"];
   const statusNames = {programm:"Mit EPG",platzhalter:"Platzhalter",ohne:"Ohne EPG",pruefen:"Zuordnung prüfen"};
-  const field = {name:0,cat:1,catId:2,provider:3,xml:4,status:5,region:6,kind:7};
+  const field = {name:0,cat:1,catId:2,provider:3,xml:4,status:5,region:6,kind:7,claimable:8};
   let data = [],filtered = [],mode = "all",page = 0;
   const pageSize = 80;
   const state = $("state");
@@ -159,6 +162,29 @@
         tr.appendChild(st);
         cell(tr,r[field.provider],"id",r[field.provider]);
         cell(tr,r[field.xml],"id",r[field.xml]);
+        const action=document.createElement("td");
+        if(r[field.claimable]&&r[field.provider]&&!r[field.xml]){
+          const link=document.createElement("a");
+          link.className="btn claim-btn";
+          link.textContent="✓ ID übernehmen";
+          link.title="Freigabe auf GitHub bestätigen. Nur der Repository-Inhaber darf Änderungen speichern.";
+          const params=new URLSearchParams({
+            title:"EPG-ID übernehmen",
+            body:"name="+r[field.name]+"\ncategory_id="+r[field.catId]+"\nprovider_id="+r[field.provider]
+          });
+          link.href="https://github.com/Malakinho/tivimate-epg/issues/new?"+params.toString();
+          link.target="_blank";link.rel="noopener noreferrer";
+          action.appendChild(link);
+        } else if(r[field.provider]&&!r[field.xml]&&r[field.status]!=="platzhalter"){
+          const note=document.createElement("span");
+          note.className="claim-note";
+          note.textContent="Keine Programme unter ID";
+          note.title="In unserer XMLTV gibt es momentan keine Sendungen für diese Anbieter-ID.";
+          action.appendChild(note);
+        } else {
+          action.textContent="–";
+        }
+        tr.appendChild(action);
         frag.appendChild(tr);
       }
       body.appendChild(frag);
@@ -197,7 +223,7 @@
   function exportCsv(){
     if(!filtered.length)return;
     const out=[names.map(escapeCsv).join(";")];
-    for(const row of filtered)out.push(row.map(escapeCsv).join(";"));
+    for(const row of filtered)out.push(row.slice(0,8).map(escapeCsv).join(";"));
     const blob=new Blob(["\ufeff",out.join("\r\n")],{type:"text/csv;charset=utf-8"});
     const url=URL.createObjectURL(blob),a=document.createElement("a");
     a.href=url;a.download="epg-senderliste-"+mode+"-"+new Date().toISOString().slice(0,10)+".csv";
