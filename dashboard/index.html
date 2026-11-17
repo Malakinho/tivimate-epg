@@ -49,7 +49,7 @@
     td { padding:13px 17px;border-top:1px solid #203048;color:#d3deee;font-size:12px;max-width:400px } th:first-child,td:first-child { padding-left:22px }
     td.channel { font-weight:650;color:#eef3fc;max-width:400px;overflow:hidden;text-overflow:ellipsis } td.category { max-width:210px;overflow:hidden;text-overflow:ellipsis;color:#a6b6ca } td.id { font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:11px;color:#9fb0c8;max-width:190px;overflow:hidden;text-overflow:ellipsis }
     tr:hover td { background:#172740 } .pill { display:inline-flex;gap:5px;align-items:center;white-space:nowrap;border-radius:7px;padding:4px 8px;font-size:11px;font-weight:690 }
-    .pill.ok { background:rgba(66,216,187,.12);color:#75eed6 } .pill.placeholder { background:rgba(246,200,115,.12);color:#f6ce89 } .pill.no { background:rgba(244,135,147,.13);color:#ffaab2 }
+    .pill.ok { background:rgba(66,216,187,.12);color:#75eed6 } .pill.placeholder { background:rgba(246,200,115,.12);color:#f6ce89 } .pill.no { background:rgba(244,135,147,.13);color:#ffaab2 } .pill.pruefen { background:rgba(148,165,215,.14);color:#c9d4ff }
     .footer { display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;padding:17px 22px;border-top:1px solid var(--line);color:var(--muted);font-size:12px }
     .pages { display:flex;align-items:center;gap:9px }.pages .btn { padding:7px 11px;min-height:32px } .btn:disabled { opacity:.35;cursor:default }
     .hint { margin-top:20px;padding:14px 18px;border:1px solid #2a3e58;border-radius:11px;color:#a9bdd0;background:#101b2d;font-size:12px }
@@ -105,7 +105,7 @@
         <label class="search-box"><span class="sr-only">Sender oder EPG-ID suchen</span><input class="control" id="search" type="search" placeholder="⌕  Sendername oder EPG-ID suchen …" autocomplete="off"></label>
         <label><span class="sr-only">Kategorie wählen</span><select class="control" id="category"><option value="">Alle Kategorien</option></select></label>
         <label><span class="sr-only">Region wählen</span><select class="control" id="region"><option value="">Alle Regionen</option><option value="DE">Deutschland</option><option value="GR">Griechenland</option><option value="DE/International">PPV – Live</option></select></label>
-        <label><span class="sr-only">Status wählen</span><select class="control" id="status"><option value="">Alle Status</option><option value="programm">Mit Programmdaten</option><option value="platzhalter">Nur Platzhalter</option><option value="ohne">Ohne EPG</option></select></label>
+        <label><span class="sr-only">Status wählen</span><select class="control" id="status"><option value="">Alle Status</option><option value="programm">Mit Programmdaten</option><option value="platzhalter">Nur Platzhalter</option><option value="ohne">Ohne EPG</option><option value="pruefen">Zuordnung prüfen</option></select></label>
       </div>
       <div class="table-meta"><span id="shown">Lade Senderdaten …</span><span id="lastUpdated">–</span></div>
       <div class="table-wrap">
@@ -118,7 +118,7 @@
       <div class="footer"><div id="pageSummary">–</div><div class="pages"><button class="btn" id="prev">← Zurück</button><span id="pageLabel">–</span><button class="btn" id="next">Weiter →</button></div></div>
     </section>
     <div class="hint">
-      <strong>Was bedeutet der Status?</strong> „Mit EPG“ bedeutet, dass wir passende Programmdaten in der XMLTV gefunden haben – nicht zwingend, dass TiviMate oder iMPlayer die Zuordnung automatisch vorgenommen hat. „Platzhalter“ zeigt bei PPV und 24/7 den Sendernamen als Programmtitel. <br>
+      <strong>Was bedeutet der Status?</strong> „Mit EPG“ bedeutet, dass wir passende Programmdaten in der XMLTV gefunden haben – nicht zwingend, dass TiviMate oder iMPlayer die Zuordnung automatisch vorgenommen hat. „Zuordnung prüfen“ kennzeichnet eine vorhandene EPG-ID, deren Programmsender möglicherweise nicht zum Stream passt. „Platzhalter“ zeigt bei PPV und 24/7 den Sendernamen als Programmtitel. <br>
       <span style="display:inline-block;margin-top:5px">Die Webapp ist eine <strong>schreibgeschützte Übersicht</strong>. Deine Zugangsdaten sind nicht enthalten. Änderungen an EPG-IDs werden derzeit weiterhin über den Generator vorgenommen. <a href="https://github.com/Malakinho/tivimate-epg/actions/workflows/update.yml" target="_blank" rel="noopener noreferrer">GitHub-Aktualisierungen ansehen</a>.</span>
     </div>
   </main>
@@ -130,7 +130,7 @@
   const format = new Intl.NumberFormat("de-DE");
   const epgUrl = new URL("epg.xml.gz",location.href).href;
   const names = ["Sendername","Kategorie","Kategorie-ID","Anbieter-EPG-ID","XMLTV-ID","EPG-Status","Region","Art"];
-  const statusNames = {programm:"Mit EPG",platzhalter:"Platzhalter",ohne:"Ohne EPG"};
+  const statusNames = {programm:"Mit EPG",platzhalter:"Platzhalter",ohne:"Ohne EPG",pruefen:"Zuordnung prüfen"};
   const field = {name:0,cat:1,catId:2,provider:3,xml:4,status:5,region:6,kind:7};
   let data = [],filtered = [],mode = "all",page = 0;
   const pageSize = 80;
@@ -155,7 +155,7 @@
         cell(tr,r[field.name],"channel",r[field.name]);
         cell(tr,r[field.cat],"category",r[field.cat]);
         const st=document.createElement("td");
-        st.appendChild(tag(statusNames[r[field.status]]||"Unbekannt",r[field.status]==="programm"?"ok":r[field.status]==="platzhalter"?"placeholder":"no"));
+        st.appendChild(tag(statusNames[r[field.status]]||"Unbekannt",r[field.status]==="programm"?"ok":r[field.status]==="platzhalter"?"placeholder":r[field.status]==="pruefen"?"pruefen":"no"));
         tr.appendChild(st);
         cell(tr,r[field.provider],"id",r[field.provider]);
         cell(tr,r[field.xml],"id",r[field.xml]);
@@ -175,7 +175,7 @@
       const st=r[field.status],kind=r[field.kind];
       if(mode==="programm"&&st!=="programm")return false;
       if(mode==="platzhalter"&&st!=="platzhalter")return false;
-      if(mode==="ohne"&&st!=="ohne")return false;
+      if(mode==="ohne"&&st!=="ohne"&&st!=="pruefen")return false;
       if(mode==="ppv"&&kind!=="PPV")return false;
       if(mode==="247"&&kind!=="24/7")return false;
       if(cat&&r[field.catId]!==cat)return false;
@@ -218,10 +218,10 @@
     data=payload.rows;
     const counts=payload.counts||{},yes=counts.programm||0,place=counts.platzhalter||0,no=counts.ohne||0,total=data.length||1;
     setText("total",format.format(data.length));setText("ok",format.format(yes));
-    setText("placeholder",format.format(place));setText("missing",format.format(no));
+    setText("placeholder",format.format(place));setText("missing",format.format(no+(counts.pruefen||0)));
     setText("navTotal",format.format(data.length));setText("navOk",format.format(yes));
-    setText("navPlace",format.format(place));setText("navNo",format.format(no));
-    $("barOk").style.width=(yes/total*100)+"%";$("barPlace").style.width=(place/total*100)+"%";$("barNo").style.width=(no/total*100)+"%";
+    setText("navPlace",format.format(place));setText("navNo",format.format(no+(counts.pruefen||0)));
+    $("barOk").style.width=(yes/total*100)+"%";$("barPlace").style.width=(place/total*100)+"%";$("barNo").style.width=((no+(counts.pruefen||0))/total*100)+"%";
     const d=new Date(payload.generated_at);
     const stamp=Number.isNaN(d.getTime())?"–":new Intl.DateTimeFormat("de-DE",{dateStyle:"medium",timeStyle:"short",timeZone:"Europe/Berlin"}).format(d);
     setText("sideUpdated","Datenstand: "+stamp);
