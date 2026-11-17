@@ -16,7 +16,8 @@ PPV = re.compile(r"\bPPV\b", re.I)
 
 def make_dashboard(*, inventory_path: Path, output_path: Path, ppv_rows,
                    always_on_rows, by_id, by_name, aliases, feeds,
-                   clean_name, market_of, best, id_valid, live_ppv: bool):
+                   clean_name, market_of, best, id_valid, live_ppv: bool,
+                   provider_fallback_ids=None):
     """Data is informational; a source match does not guarantee player assignment."""
     with inventory_path.open(encoding="utf-8-sig", newline="") as handle:
         inventory = list(csv.DictReader(handle))
@@ -35,6 +36,7 @@ def make_dashboard(*, inventory_path: Path, output_path: Path, ppv_rows,
     alias_keys = {a.casefold(): a for a in aliases}
     rows = []
     counters = Counter()
+    provider_fallback_ids = provider_fallback_ids or {}
 
     def add(name, category, category_id, user_id, epg_id, status, region, kind):
         rows.append([name, category, category_id, user_id, epg_id, status, region, kind])
@@ -97,6 +99,12 @@ def make_dashboard(*, inventory_path: Path, output_path: Path, ppv_rows,
 
         if actual is not None:
             add(name, cat, category_id, provider_id, display_id,
+                "programm", market, kind)
+        elif id_valid(provider_id) and provider_id.casefold() in provider_fallback_ids:
+            # Real programme entries from the authenticated provider XMLTV
+            # are now included under this playlist EPG ID.
+            add(name, cat, category_id, provider_id,
+                provider_fallback_ids[provider_id.casefold()],
                 "programm", market, kind)
         else:
             add(name, cat, category_id, provider_id, "", "ohne", market, kind)
