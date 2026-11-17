@@ -71,6 +71,7 @@
     <div class="side-label">Übersicht</div>
     <nav aria-label="EPG-Filter">
       <button class="navitem active" data-mode="all"><span class="symbol">▦</span> Alle Sender <span class="count" id="navTotal">–</span></button>
+      <button class="navitem" data-mode="normal"><span class="symbol">▣</span> Normale Sender <span class="count" id="navNormal">–</span></button>
       <button class="navitem" data-mode="programm"><span class="symbol">◉</span> Mit EPG <span class="count" id="navOk">–</span></button>
       <button class="navitem" data-mode="ohne"><span class="symbol">◌</span> Ohne EPG <span class="count" id="navNo">–</span></button>
       <button class="navitem" data-mode="platzhalter"><span class="symbol">▤</span> Platzhalter <span class="count" id="navPlace">–</span></button>
@@ -199,6 +200,7 @@
       cat=$("category").value,region=$("region").value,status=$("status").value;
     filtered=data.filter(function(r){
       const st=r[field.status],kind=r[field.kind];
+      if(mode==="normal"&&kind!=="Sender")return false;
       if(mode==="programm"&&st!=="programm")return false;
       if(mode==="platzhalter"&&st!=="platzhalter")return false;
       if(mode==="ohne"&&st!=="ohne"&&st!=="pruefen")return false;
@@ -217,7 +219,7 @@
   }
   function selectMode(newMode){
     mode=newMode;document.querySelectorAll(".navitem").forEach(function(x){x.classList.toggle("active",x.dataset.mode===newMode)});
-    setText("sectionTitle",({all:"Alle Sender",programm:"Sender mit EPG",ohne:"Sender ohne EPG",platzhalter:"EPG-Platzhalter",ppv:"PPV-Sender",247:"24/7-Sender"})[newMode]);
+    setText("sectionTitle",({all:"Alle Sender",normal:"Normale TV-Sender",programm:"Sender mit EPG",ohne:"Sender ohne EPG",platzhalter:"EPG-Platzhalter",ppv:"PPV-Sender",247:"24/7-Sender"})[newMode]);
     apply();
   }
   function exportCsv(){
@@ -248,7 +250,7 @@
     const counts=payload.counts||{},yes=counts.programm||0,place=counts.platzhalter||0,no=counts.ohne||0,total=data.length||1;
     setText("total",format.format(data.length));setText("ok",format.format(yes));
     setText("placeholder",format.format(place));setText("missing",format.format(no+(counts.pruefen||0)));
-    setText("navTotal",format.format(data.length));setText("navOk",format.format(yes));
+    setText("navTotal",format.format(data.length));setText("navNormal",format.format(data.filter(function(row){return row[field.kind]==="Sender"}).length));setText("navOk",format.format(yes));
     setText("navPlace",format.format(place));setText("navNo",format.format(no+(counts.pruefen||0)));
     $("barOk").style.width=(yes/total*100)+"%";$("barPlace").style.width=(place/total*100)+"%";$("barNo").style.width=((no+(counts.pruefen||0))/total*100)+"%";
     const d=new Date(payload.generated_at);
