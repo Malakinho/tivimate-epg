@@ -1,0 +1,30 @@
+name: EPG Freunde verwalten
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: write
+  issues: write
+  actions: write
+
+concurrency:
+  group: epg-friends-management
+  cancel-in-progress: false
+
+jobs:
+  manage:
+    if: ${{ github.event.issue.user.login == github.repository_owner && github.event.issue.title == 'EPG-Freund verwalten' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Repository abrufen
+        uses: actions/checkout@v4
+      - name: Python einrichten
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Freund verwalten und EPG aktualisieren
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python friends_admin.py
