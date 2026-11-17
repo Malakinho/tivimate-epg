@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#0a1020">
+  <title>Meine M3U mit EPG · EPG Manager</title>
+  <style>
+    :root{color-scheme:dark;--bg:#080d19;--panel:#111b2e;--secondary:#16243b;--line:#2a3b56;--text:#eef3fc;--muted:#9aadc6;--accent:#42d8bb}
+    *{box-sizing:border-box}body{background:var(--bg);color:var(--text);font:14px/1.55 system-ui,-apple-system,Segoe UI,Arial,sans-serif;margin:0}
+    .wrap{max-width:920px;margin:0 auto;padding:32px 18px 60px}a{color:var(--accent)}
+    header{display:flex;gap:12px;align-items:center;margin-bottom:25px}header a{font-size:13px}
+    h1{font-size:clamp(25px,5vw,35px);line-height:1.18;margin:0 0 12px}h2{font-size:18px;margin:0 0 14px}
+    p{color:var(--muted);margin:8px 0 16px}.lead{font-size:16px;max-width:720px}
+    .card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:22px;margin-bottom:17px}
+    .stack{display:grid;gap:10px}.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+    label{display:block;font-weight:650;margin-bottom:7px}
+    input[type=file],input[type=url]{display:block;width:100%;border:1px solid var(--line);border-radius:10px;background:var(--secondary);padding:12px;color:var(--text);font:inherit}
+    input:focus-visible,button:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+    button{border:1px solid var(--line);background:var(--secondary);color:var(--text);border-radius:10px;padding:12px 17px;font:inherit;font-weight:650;cursor:pointer}
+    button.primary{background:var(--accent);color:#051b1d;border-color:var(--accent)}
+    button:disabled{opacity:.45;cursor:not-allowed}.hint{font-size:12px;color:var(--muted)}
+    .pill{font-size:11px;color:var(--accent);border:1px solid #235a50;border-radius:999px;padding:4px 10px}
+    .stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:15px}
+    .stat{background:var(--secondary);border-radius:10px;padding:14px}.number{font-size:24px;font-weight:780}
+    .note{border-left:3px solid var(--accent);padding:9px 14px;background:var(--secondary);border-radius:0 8px 8px 0}
+    .error{color:#ffb4bd}.ok{color:#87f5d3}
+    .status{min-height:22px;font-size:13px;margin:12px 0 0}.hidden{display:none}
+    @media(max-width:560px){.wrap{padding:22px 13px 45px}.card{padding:17px}.stats{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <header><a href="./">← Zurück zum EPG Manager</a><span class="pill">Nur für meine Playlist</span></header>
+  <h1>Meine M3U mit fertiger EPG-Zuordnung</h1>
+  <p class="lead">Lade deine Original-M3U hoch. Die App übernimmt passende XMLTV-IDs aus unserer EPG, ohne Sender, Streaming-Adressen oder Zugangsdaten zu verändern.</p>
+  <div class="note">
+    <strong>Privat auf deinem Gerät:</strong> Deine M3U wird nur im Browser gelesen und als neue Datei heruntergeladen. Sie wird nicht an GitHub oder einen anderen Server geschickt. Die Webseite selbst bleibt öffentlich.
+  </div>
+  <section class="card" style="margin-top:18px" aria-labelledby="step1">
+    <h2 id="step1">1. Anbieter-Playlist auswählen</h2>
+    <label for="source">Deine M3U-Datei (.m3u oder .m3u8)</label>
+    <input id="source" type="file" accept=".m3u,.m3u8,.txt,text/plain,audio/x-mpegurl">
+    <p class="hint">Du kannst deine Original-M3U beim IPTV-Anbieter herunterladen und hier auswählen. Die Datei kann vertrauliche Stream-Links enthalten.</p>
+  </section>
+  <section class="card" aria-labelledby="step2">
+    <h2 id="step2">2. Meine EPG-Adresse</h2>
+    <label for="epgUrl">Persönliche XMLTV-URL</label>
+    <input id="epgUrl" type="url" placeholder="https://.../epg.xml.gz" spellcheck="false" autocomplete="off">
+    <p id="epgHint" class="hint">Dein aktiver Link „Mein EPG“ wird automatisch eingesetzt. Du kannst ihn bei Bedarf ändern.</p>
+  </section>
+  <section class="card" aria-labelledby="step3">
+    <h2 id="step3">3. EPG-IDs eintragen und M3U herunterladen</h2>
+    <div class="row">
+      <button id="generate" class="primary" type="button" disabled>EPG-Zuordnung erstellen</button>
+      <button id="clear" type="button">Zurücksetzen</button>
+    </div>
+    <div id="status" class="status" role="status">EPG-Senderdaten werden geladen …</div>
+    <div id="results" class="stats hidden" aria-label="Ergebnis">
+      <div class="stat"><div class="number" id="total">–</div><div class="hint">Playlist-Sender</div></div>
+      <div class="stat"><div class="number ok" id="assigned">–</div><div class="hint">Sicher zugeordnete Sender</div></div>
+      <div class="stat"><div class="number" id="open">–</div><div class="hint">Ohne neue Zuordnung</div></div>
+    </div>
+    <p class="hint">Nur eindeutige Treffer werden übernommen. Zweifelhafte, nicht vorhandene und fehlende EPG-IDs bleiben unverändert. Die M3U erhält im Kopf die persönliche XMLTV-URL für unterstützte Player.</p>
+  </section>
+  <p class="hint">Diese Funktion erzeugt eine <strong>herunterladbare Datei</strong>, keinen dauerhaften öffentlichen M3U-Link. Das schützt die Stream-Adressen vor einer Veröffentlichung auf GitHub Pages. Manche iMPlayer-Versionen benötigen zusätzlich eine manuell eingetragene XMLTV-URL.</p>
+</div>
+<script>
+(function(){
+  "use strict";
+  const $=id=>document.getElementById(id);
+  const state={rows:[],ready:false};
+  function message(text,error=false){
+    $("status").textContent=text;
+    $("status").className="status "+(error?"error":"");
+  }
+  function canonicalName(text){
+    let s=String(text||"").normalize("NFKC").toUpperCase().trim();
+    s=s.replace(/^(?:DE GO|DE|GR|PRIME|JOYN|WOW|SKYGO)\s*[:\-]\s*/i,"");
+    s=s.replace(/\b(?:RAW|HEVC|H265|H264|FHD|HD|UHD|4K|8K|720P|1080P|2160P|50FPS|60FPS|30FPS|BACKUP)\b/gi," ");
+    s=s.replace(/[◉●◆★☆■▣⭐]/g," ");
+    s=s.replace(/[^A-Z0-9ÄÖÜΑ-ΩΆΈΉΊΌΎΏ&+]/g," ");
+    return s.replace(/\s+/g," ").trim();
+  }
+  function getAttribute(info,name) {
+    const re=new RegExp("(?:^|\\s)"+name+"\\s*=\\s*\"([^\"]*)\"","i");
+    const m=info.match(re);
+    return m?m[1]:"";
+  }
+  function setTvgId(info,id) {
+    const escaped=id.replace(/&/g,"&amp;").replace(/"/g,"&quot;");
+    const re=/(^|\s)tvg-id\s*=\s*"[^"]*"/i;
+    return re.test(info)?info.replace(re,(all,space)=>space+'tvg-id="'+escaped+'"'):
+      info.replace(/^#EXTINF:([^\s,]*)/i,(_,duration)=>'#EXTINF:'+duration+' tvg-id="'+escaped+'"');
+  }
+  function splitInfo(line){
+    let quoted=false;
+    for(let i=0;i<line.length;i++){
+      if(line[i]==='"')quoted=!quoted;
+      else if(line[i]===","&&!quoted)return [line.slice(0,i),line.slice(i+1)];
+    }
+    return [line,""];
+  }
+  function createIndex(rows) {
+    const names=new Map();
+    // Only confirmed matches / published placeholders, never tentative IDs.
+    for(const r of rows){
+      if(!["programm","platzhalter"].includes(r[5])||!r[4]||!r[0])continue;
+      const key=canonicalName(r[0]);
+      if(!key)continue;
+      const item={id:String(r[4]),provider:String(r[3]||""),name:String(r[0])};
+      if(!names.has(key))names.set(key,[]);
+      names.get(key).push(item);
+    }
+    return names;
+  }
+  function chooseId(candidates,originalId,originalName) {
+    if(!candidates||!candidates.length)return "";
+    let pool=candidates;
+    if(originalId){
+      const id=originalId.toLowerCase();
+      const exact=pool.filter(r=>r.provider.toLowerCase()===id||r.id.toLowerCase()===id);
+      if(exact.length)pool=exact;
+    }
+    const raw=String(originalName||"").trim().toLocaleLowerCase("de");
+    const matching=pool.filter(x=>x.name.trim().toLocaleLowerCase("de")===raw);
+    if(matching.length)pool=matching;
+    const distinct=[...new Set(pool.map(r=>r.id.toLowerCase()))];
+    return distinct.length===1?pool[0].id:"";
+  }
+  function rewriteHeader(line,epg){
+    let header=line;
+    for(const attribute of ["x-tvg-url","url-tvg"]){
+      const re=new RegExp("\\s"+attribute+"\\s*=\\s*\"[^\"]*\"","ig");
+      header=header.replace(re,"");
+    }
+    // Attribute names are universally untrusted. Never concatenate raw user
+    // input before validating the URL and escaping quotes.
+    const safe=epg.replace(/&/g,"&amp;").replace(/"/g,"&quot;");
+    return header+' x-tvg-url="'+safe+'" url-tvg="'+safe+'"';
+  }
+  function fixPlaylist(text,index,epg) {
+    const lf=text.includes("\r\n")?"\r\n":"\n";
+    const lines=text.replace(/^\uFEFF/,"").split(/\r?\n/);
+    let touched=0,total=0,known=0;
+    for(let i=0;i<lines.length;i++){
+      if(!lines[i].startsWith("#EXTINF:"))continue;
+      total++;
+      const [head,name]=splitInfo(lines[i]);
+      const provider=getAttribute(head,"tvg-id");
+      const tvgName=getAttribute(head,"tvg-name");
+      let target=chooseId(index.get(canonicalName(name)),provider,name);
+      if(!target&&tvgName)target=chooseId(index.get(canonicalName(tvgName)),provider,tvgName);
+      if(target){
+        known++;
+        if(provider!==target){
+          lines[i]=setTvgId(head,target)+(name!==""?","+name:"");
+          touched++;
+        }
+      }
+    }
+    const first=lines.findIndex(x=>x.trim().length>0);
+    if(first>=0&&lines[first].startsWith("#EXTM3U"))lines[first]=rewriteHeader(lines[first],epg);
+    else lines.unshift('#EXTM3U x-tvg-url="'+epg.replace(/&/g,"&amp;")+'" url-tvg="'+epg.replace(/&/g,"&amp;")+'"');
+    return {output:lines.join(lf),total,touched,known};
+  }
+  let index=null;
+  async function prepare(){
+    try {
+      const [channels,friends]=await Promise.all([
+        fetch("dashboard.json",{cache:"no-store"}).then(r=>{if(!r.ok)throw Error("Senderliste nicht verfügbar");return r.json();}),
+        fetch("friends.json",{cache:"no-store"}).then(r=>{if(!r.ok)throw Error("EPG-Linkliste nicht verfügbar");return r.json();})
+      ]);
+      index=createIndex(channels.rows||[]);
+      const own=(friends.friends||[]).find(f=>f.id==="owner"&&f.active&&f.path);
+      if(own){
+        $("epgUrl").value=new URL(own.path,location.href).href;
+        $("epgHint").textContent="Dein aktiver persönlicher Link „Mein EPG“ ist eingetragen.";
+      }else{
+        $("epgHint").textContent="Bitte trage einen aktiven persönlichen XMLTV-Link ein.";
+      }
+      state.ready=true;
+      $("generate").disabled=false;
+      message("EPG-Katalog geladen. Du kannst deine M3U-Datei jetzt umwandeln.");
+    }catch(err){
+      message("EPG-Daten konnten nicht geladen werden. Bitte Seite neu öffnen.",true);
+    }
+  }
+  $("generate").addEventListener("click",async()=>{
+    const file=$("source").files[0];
+    if(!file){message("Bitte zuerst deine Anbieter-M3U-Datei auswählen.",true);return;}
+    if(file.size>80*1024*1024){message("Die M3U-Datei ist größer als 80 MB.",true);return;}
+    let epg;
+    try{
+      epg=new URL($("epgUrl").value.trim());
+      if(epg.protocol!=="https:"||!epg.hostname||/[\"<>]/.test($("epgUrl").value)){
+        throw Error("Ungültige HTTPS-URL.");
+      }
+    }catch(err){message("Bitte eine gültige HTTPS-Adresse deiner EPG eintragen.",true);return;}
+    $("generate").disabled=true;
+    try{
+      const source=await file.text();
+      if(!source.includes("#EXTINF:"))throw Error("Die Datei enthält keine M3U-Sender (#EXTINF).");
+      const patched=fixPlaylist(source,index,epg.href);
+      const blob=new Blob(["\ufeff",patched.output],{type:"audio/x-mpegurl;charset=utf-8"});
+      const href=URL.createObjectURL(blob);
+      const a=document.createElement("a");
+      a.href=href;a.download="meine-m3u-mit-epg.m3u";document.body.appendChild(a);
+      a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(href),8000);
+      $("results").classList.remove("hidden");
+      $("total").textContent=patched.total.toLocaleString("de-DE");
+      $("assigned").textContent=patched.known.toLocaleString("de-DE");
+      $("open").textContent=(patched.total-patched.known).toLocaleString("de-DE");
+      message("Download gestartet. "+patched.touched+" EPG-IDs ergänzt oder korrigiert; "+(patched.known-patched.touched)+" waren bereits passend.");
+    }catch(e){message(e.message||"M3U-Datei konnte nicht verarbeitet werden.",true);}
+    finally{$("generate").disabled=false;}
+  });
+  $("clear").addEventListener("click",()=>{
+    $("source").value="";
+    $("results").classList.add("hidden");
+    message("Bereit für deine nächste M3U-Datei.");
+  });
+  prepare();
+})();
+</script>
+</body>
+</html>
