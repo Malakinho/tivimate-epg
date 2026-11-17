@@ -8,6 +8,9 @@ on:
     paths:
       - 'build.py'
       - 'xtream_ppv.py'
+      - 'provider_epg.py'
+      - 'dashboard_data.py'
+      - 'dashboard/**'
       - 'data/**'
       - '.github/workflows/update.yml'
 
