@@ -12,6 +12,7 @@ from pathlib import Path
 
 HEADER = re.compile(r"^#{2,}")
 PPV = re.compile(r"\bPPV\b", re.I)
+ALWAYS_ON = re.compile(r"(?<!\d)24\s*[/\-]\s*7(?!\d)", re.I)
 
 
 def make_dashboard(*, inventory_path: Path, output_path: Path, ppv_rows,
@@ -66,8 +67,10 @@ def make_dashboard(*, inventory_path: Path, output_path: Path, ppv_rows,
             continue
         cat = headings.get(category_id, "Kategorie " + category_id)
         provider_id = (rec.get("epg_channel_id") or "").strip()
-        is_ppv = bool(PPV.search(name))
-        is_always = name in by_always
+        # Classify by both the sender name and its provider category.
+        # Some event/24/7 streams have generic titles without those words.
+        is_ppv = bool(PPV.search(name) or PPV.search(cat))
+        is_always = bool(name in by_always or ALWAYS_ON.search(name) or ALWAYS_ON.search(cat))
         market = market_of(name)
         if name.startswith("GR:") or any("\u0370" <= c <= "\u03ff" for c in cat):
             market = "GR"
