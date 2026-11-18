@@ -56,6 +56,11 @@ def make_dashboard(*, inventory_path: Path, output_path: Path, ppv_rows,
         "skycinemapremieren.de": (r"\bSKY CINEMA PREMIEREN\b", "SKY CINEMA PREMIERE"),
         "ard.de": (r"\bDAS ERSTE\b", "DAS ERSTE"),
         "novasportsextra.gr": (r"\b(?:NOVASPORTS EXTRA 1|NOVA EXTRA SPORTS 1)\b", "NOVASPORTS EXTRA 1"),
+        # Inspected against published XMLTV source display-names:
+        # GR: ALPH HD == ALPHA.gr (ALPHA), DE: EURO SPORT 1 RAW
+        # == Eurosport1.de (Eurosport 1). Only these exact spellings pass.
+        "alpha.gr": (r"^ALPH$", "ALPHA"),
+        "eurosport1.de": (r"^EURO SPORT 1$", "EUROSPORT 1"),
     }
     rows = []
     counters = Counter()

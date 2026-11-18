@@ -129,6 +129,39 @@ class RealEpgPriorityTests(unittest.TestCase):
             self.assertEqual(report["rows"][0][0], "GR: MOVIE NEW")
             self.assertEqual(report["rows"][0][4:6], ["always.old", "programm"])
 
+    def test_verified_epg_spelling_variants_recover_only_two_checked_ids(self):
+        from types import SimpleNamespace
+        alpha = self.channel("ALPHA.gr", "GR - ALPHA", 1, 15)
+        euro = self.channel("Eurosport1.de", "DE - Eurosport 1", 0, 20)
+        with tempfile.TemporaryDirectory() as tmp:
+            inv, out = Path(tmp) / "inventory.csv", Path(tmp) / "dashboard.json"
+            entries = [
+                ("GR: ALPH ᴴᴰ", "ALPHA.gr", "4"),
+                ("DE: EURO SPORT 1 ᴿᴬᵂ", "Eurosport1.de", "2032"),
+                ("DE: EURO SPORT 2 ᴿᴬᵂ", "Eurosport1.de", "2032"),
+            ]
+            with inv.open("w", newline="", encoding="utf-8") as f:
+                writer = csv.DictWriter(
+                    f, fieldnames=["name", "epg_channel_id", "category_id"])
+                writer.writeheader()
+                for name, epg_id, category in entries:
+                    writer.writerow({"name": name, "epg_channel_id": epg_id,
+                                     "category_id": category})
+            report = make_dashboard(
+                inventory_path=inv, output_path=out, ppv_rows=[],
+                always_on_rows=[], named_rows=[],
+                by_id={"alpha.gr": alpha, "eurosport1.de": euro},
+                by_name={}, by_compact={}, aliases={}, feeds=self.feeds,
+                clean_name=clean_name, market_of=market_of,
+                best=lambda *args: None, id_valid=id_valid, live_ppv=False,
+            )
+            statuses = {r[0]: (r[4], r[5]) for r in report["rows"]}
+            self.assertEqual(statuses["GR: ALPH ᴴᴰ"],
+                             ("ALPHA.gr", "programm"))
+            self.assertEqual(statuses["DE: EURO SPORT 1 ᴿᴬᵂ"],
+                             ("Eurosport1.de", "programm"))
+            self.assertEqual(statuses["DE: EURO SPORT 2 ᴿᴬᵂ"][1], "pruefen")
+
     def test_provider_xmltv_copies_only_real_titles_to_stable_alias(self):
         doc = (
             '<tv><channel id="Provider.gr"><display-name>Provider</display-name></channel>'
