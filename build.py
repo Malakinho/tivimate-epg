@@ -343,6 +343,45 @@ def selected_country_names() -> dict[str, set[str]]:
     return result
 
 
+def extend_always_on_categories(always_on_rows: list[dict], input_rows: list[dict]) -> list[dict]:
+    """Add name-as-programme placeholders for 24/7 *categories* with no EPG ID.
+
+    Previously only 24/7 text in the channel name was exported.  Some entire
+    category groups (e.g. 24/7 Prime Video, Disney+ or COSMOTE Film) have
+    ordinary-looking channel names, so they incorrectly appeared as no EPG.
+    Do not replace real provider programme IDs.
+    """
+    category_titles: dict[str, str] = {}
+    for row in input_rows:
+        name = (row.get("name") or "").strip()
+        category_id = (row.get("category_id") or "").strip()
+        if name.startswith("##") and category_id not in category_titles:
+            category_titles[category_id] = name
+
+    result = list(always_on_rows)
+    existing = {(row.get("name") or "").strip() for row in result}
+    added = 0
+    for row in input_rows:
+        name = (row.get("name") or "").strip()
+        category_id = (row.get("category_id") or "").strip()
+        provider_id = (row.get("epg_channel_id") or "").strip()
+        category = category_titles.get(category_id, "")
+        if (not name or name.startswith("##") or name in existing
+                or id_valid(provider_id)
+                or not re.search(r"(?<!\d)24\s*[/\-]\s*7(?!\d)", category, re.I)
+                or re.search(r"\bPPV\b", category + " " + name, re.I)):
+            continue
+        result.append({
+            "id": "always." + hashlib.sha256(name.encode("utf-8")).hexdigest()[:20],
+            "name": name,
+            "category_id": category_id,
+        })
+        existing.add(name)
+        added += 1
+    logging.info("24/7 category-based placeholders added: %d", added)
+    return result
+
+
 def build() -> dict:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     with DATA.open("r", encoding="utf-8-sig", newline="") as csvfile:
@@ -366,6 +405,7 @@ def build() -> dict:
     # where the provider supplied no EPG ID.
     with ALWAYS_ON_DATA.open("r", encoding="utf-8-sig", newline="") as csvfile:
         always_on_rows = list(csv.DictReader(csvfile))
+    always_on_rows = extend_always_on_categories(always_on_rows, input_rows)
     placeholder_rows = ppv_rows + always_on_rows
     with tempfile.TemporaryDirectory() as temp:
         temp_dir = Path(temp)
