@@ -405,7 +405,11 @@ def build() -> dict:
     # where the provider supplied no EPG ID.
     with ALWAYS_ON_DATA.open("r", encoding="utf-8-sig", newline="") as csvfile:
         always_on_rows = list(csv.DictReader(csvfile))
-    always_on_rows = extend_always_on_categories(always_on_rows, input_rows)
+    # The full IPTV inventory contains the 24/7 categories; channels.csv
+    # only covers a smaller selected channel cohort.
+    with (ROOT / "data" / "inventory.csv").open("r", encoding="utf-8-sig", newline="") as csvfile:
+        full_inventory = list(csv.DictReader(csvfile))
+    always_on_rows = extend_always_on_categories(always_on_rows, full_inventory)
     placeholder_rows = ppv_rows + always_on_rows
     with tempfile.TemporaryDirectory() as temp:
         temp_dir = Path(temp)
