@@ -87,6 +87,11 @@ def clean_name(value: str) -> str:
     value = re.sub(r"\bERT\s+([123])\b", r"ERT\1", value)
     value = re.sub(r"\bANT\s+1\b", "ANT1", value)
     value = re.sub(r"\b3\s+SAT\b", "3SAT", value)
+    # Whitelisted whitespace variants of the same public TV channel.
+    # In particular: JOYN: ZDF INFO RAW == PRIME: ZDFINFO RAW == ZDFinfo.de.
+    # Keep ZDF, ZDFinfo, ZDFneo and any numbered variants distinct.
+    value = re.sub(r"\bZDF\s+INFO\b", "ZDFINFO", value)
+    value = re.sub(r"\bZDF\s+NEO\b", "ZDFNEO", value)
     value = re.sub(r"\bSKY\s+SPORT\s+BUNDESLIGA\b", "SKY BUNDESLIGA", value)
     # Same Greek sports channel under differently formatted source names.
     value = re.sub(r"\bMAGENTA SPORT LEAGUE ([1-4])\b", r"MAGENTA SPORT \1 LEAGUE", value)
