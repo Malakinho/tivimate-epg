@@ -1,6 +1,8 @@
 """Ensure 24/7 category streams without provider EPG IDs get placeholders."""
+import csv
 import hashlib
 import unittest
+from pathlib import Path
 
 from build import extend_always_on_categories
 
@@ -24,6 +26,19 @@ class CategoryPlaceholdersTest(unittest.TestCase):
         self.assertEqual(result[0]["id"], "always." +
                          hashlib.sha256(b"US: FALLOUT RAW").hexdigest()[:20])
         self.assertEqual(result, extend_always_on_categories(result, records))
+
+    def test_actual_full_inventory_adds_missing_category_placeholders(self):
+        root = Path(__file__).resolve().parent
+        with (root / "data" / "inventory.csv").open(encoding="utf-8-sig", newline="") as source:
+            inventory = list(csv.DictReader(source))
+        with (root / "data" / "always_on.csv").open(encoding="utf-8-sig", newline="") as source:
+            existing = list(csv.DictReader(source))
+        extended = extend_always_on_categories(existing, inventory)
+        new = extended[len(existing):]
+        self.assertGreaterEqual(len(new), 160)
+        targets = {x["name"] for x in new}
+        self.assertIn("GR: COSMOTE FILM 1 4K", targets)
+        self.assertIn("US: FALLOUT ᴿᴬᵂ", targets)
 
     def test_preserve_already_known_placeholders(self):
         original = {"id": "always.existing", "name": "US: FALLOUT", "category_id": "2213"}
