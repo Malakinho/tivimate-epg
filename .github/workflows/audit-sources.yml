@@ -36,12 +36,17 @@ jobs:
               ('TR-IPTV', 'TR', 'https://iptv-epg.org/files/epg-tr.xml'),
               ('GB-FREEEPG', 'GB', 'https://free-epg.de/api/epg/gb.xml.gz'),
               ('US-FREEEPG', 'US', 'https://free-epg.de/api/epg/us.xml.gz'),
+              ('US-IPTV', 'US', 'https://iptv-epg.org/files/epg-us.xml.gz'),
+              ('US-XMLTVLIVE', 'US', 'https://xmltv.live/epg/us.xml.gz'),
+              ('HR-IPTV', 'HR', 'https://iptv-epg.org/files/epg-hr.xml.gz'),
+              ('ES-IPTV', 'ES', 'https://iptv-epg.org/files/epg-es.xml.gz'),
+              ('NL-IPTV', 'NL', 'https://iptv-epg.org/files/epg-nl.xml.gz'),
               ('GR-OPENEPG', 'GR', 'https://www.open-epg.com/files/greece.xml.gz'),
               ('DE-OPENEPG', 'DE', 'https://www.open-epg.com/files/germany.xml.gz'),
               ('GB-EPGPW', 'GB', 'https://epg.pw/xmltv/epg_GB.xml.gz'),
           ]
           PREFIX=re.compile(r'^(?:UK|US|GB|FR|IT|PL|TR|ES|NL|RO|HR|GR|DE|BG|SR|SI|PT|CY|CH|AT|NZ|AF|SG)\s*[:\-]\s*',re.I)
-          RG={'UK':'GB','GB':'GB','US':'US','FR':'FR','IT':'IT','PL':'PL','TR':'TR','GR':'GR','DE':'DE'}
+          RG={'UK':'GB','GB':'GB','US':'US','FR':'FR','IT':'IT','PL':'PL','TR':'TR','GR':'GR','DE':'DE','HR':'HR','ES':'ES','NL':'NL'}
           def get(url,limit=75*1024*1024):
               with urlopen(Request(url,headers={'User-Agent':'EPG-coverage-audit/1.0'}),timeout=40) as r:
                   b=r.read(limit+1)
