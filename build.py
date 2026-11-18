@@ -844,6 +844,7 @@ def build() -> dict:
         result["dashboard_counts"] = dashboard["counts"]
         shutil.copyfile(ROOT / "dashboard" / "index.html", OUT_DIR / "index.html")
         shutil.copyfile(ROOT / "dashboard" / "m3u.html", OUT_DIR / "m3u.html")
+        shutil.copyfile(ROOT / "dashboard" / "diagnostics.js", OUT_DIR / "diagnostics.js")
         if xtream_url:
             result["placeholder_stream_bindings"] = write_bindings(
                 OUT_DIR / "placeholder-bindings.json",

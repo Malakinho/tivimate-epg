@@ -98,6 +98,27 @@
     .friend-buttons .btn { font-size:11px;padding:7px 9px; }
     .friend-help { font-size:12px;color:var(--muted) }
     .friend-message { font-size:12px;min-height:18px;color:var(--muted) }
+    .diag-panel { margin:22px 0;scroll-margin-top:20px }
+    .diag-inner { padding:0 22px 22px }
+    .diag-grid { display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:0 0 17px }
+    .diag-card { border:1px solid var(--line);border-radius:11px;background:var(--panel2);padding:14px }
+    .diag-card strong { display:block;font-size:24px;line-height:1.25;margin:7px 0;font-variant-numeric:tabular-nums }
+    .diag-card span { display:block;font-size:12px;color:var(--muted) }
+    .diag-row { display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:16px }
+    .diag-alerts { list-style:none;padding:0;margin:0 0 16px;display:grid;gap:8px }
+    .diag-alerts li { padding:11px 13px;border:1px solid #395067;border-radius:9px;background:#15233a;color:#dce9f4;font-size:12px }
+    .diag-alerts .bad { color:#ffb0b7;border-color:#744653;background:#30202b }
+    .diag-alerts .warn { color:#f6d399;border-color:#6e5836;background:#2d281e }
+    .diag-alerts .good { color:#8fe3ce;border-color:#315a52;background:#132d2b }
+    .diag-subtitle { font-weight:700;font-size:13px;margin:18px 0 8px }
+    .diag-sourcewrap { overflow:auto;border:1px solid var(--line);border-radius:10px }
+    .diag-sourcewrap table { width:100% }.diag-sourcewrap td { padding:10px 12px;font-size:12px }
+    .diag-sourcewrap th { padding:11px 12px }.diag-sourcewrap td:first-child,.diag-sourcewrap th:first-child { padding-left:14px }
+    .diag-sourcewrap .pill { font-size:10px }
+    .diag-help { font-size:11px;color:var(--muted);line-height:1.6;margin:12px 0 0 }
+    .diag-help a { color:var(--teal);text-decoration:underline }
+    @media(max-width:940px){ .diag-grid { grid-template-columns:repeat(2,minmax(0,1fr)) } }
+    @media(max-width:480px){ .diag-inner { padding:0 13px 16px } .diag-grid { gap:7px } .diag-card { padding:10px } .diag-card strong { font-size:19px } }
   </style>
 </head>
 <body>
@@ -116,6 +137,7 @@
     </nav>
     <div class="side-label" style="margin-top:15px">Verwaltung</div>
     <a class="navitem" href="m3u.html"><span class="symbol">▤</span> Meine M3U mit EPG</a>
+    <a class="navitem" id="navDiagnose" href="#diagnosePanel"><span class="symbol">◈</span> Diagnose &amp; Überwachung</a>
     <a class="navitem" id="navFriends" href="#friendsPanel"><span class="symbol">♧</span> Freunde &amp; EPG-Links</a>
     <div class="side-bottom">
       <div><span class="dot"></span><strong>GitHub Pages</strong></div>
@@ -138,6 +160,37 @@
     <div class="progress" role="img" id="progress" aria-label="EPG-Abdeckung">
       <span class="ok" id="barOk"></span><span class="placeholder" id="barPlace"></span><span class="no" id="barNo"></span>
     </div>
+    <section class="section diag-panel" id="diagnosePanel" aria-labelledby="diagnoseHeading">
+      <div class="section-head">
+        <div>
+          <h2 id="diagnoseHeading">Diagnose &amp; Fehlerüberwachung</h2>
+          <p class="section-desc">Quellen, Aktualisierungen und EPG-Zuordnung kontrollieren. Fehler werden hier sichtbar.</p>
+        </div>
+        <button class="btn" type="button" id="diagRefresh">↻ Diagnose aktualisieren</button>
+      </div>
+      <div class="diag-inner">
+        <div class="diag-row">
+          <span id="diagHealth" class="pill pruefen" role="status">◷ Diagnose wird geladen</span>
+          <span class="small" id="diagUpdated">Datenstand wird geprüft …</span>
+          <a class="btn" id="diagRunLink" href="https://github.com/Malakinho/tivimate-epg/actions/workflows/update.yml" target="_blank" rel="noopener noreferrer">GitHub-Durchlauf ansehen</a>
+        </div>
+        <div class="diag-grid" aria-label="Diagnose-Kennzahlen">
+          <div class="diag-card"><span>EPG-Quellen erreichbar</span><strong id="diagSourceOk">–</strong><span id="diagSourceDetail">Öffentliche Quellen</span></div>
+          <div class="diag-card"><span>Echte Sendungen statt Platzhalter</span><strong id="diagPromoted">–</strong><span>Automatisch verbesserte Sender</span></div>
+          <div class="diag-card"><span>Statische Platzhalter</span><strong id="diagStatic">–</strong><span>Keine Live-Sendernamen verfügbar</span></div>
+          <div class="diag-card"><span>Zuordnung prüfen</span><strong id="diagUncertain">–</strong><span>Sender mit unsicherer EPG-ID</span></div>
+        </div>
+        <ul class="diag-alerts" id="diagAlerts" aria-live="polite"><li>Diagnosedaten werden geladen …</li></ul>
+        <div class="diag-subtitle">EPG-Quellen im letzten erfolgreichen Build</div>
+        <div class="diag-sourcewrap">
+          <table>
+            <thead><tr><th>Quelle</th><th>Region</th><th>Status</th><th>Sender</th><th>Sendungen</th></tr></thead>
+            <tbody id="diagSources"><tr><td colspan="5">Wird geladen …</td></tr></tbody>
+          </table>
+        </div>
+        <p class="diag-help" id="diagHelp">Die Seite zeigt den letzten veröffentlichten EPG-Stand. Für fehlgeschlagene Aktualisierungen wird zusätzlich der öffentliche GitHub-Actions-Status geprüft. Fehler verursachen keinen Zugriff auf deine IPTV-Zugangsdaten.</p>
+      </div>
+    </section>
     <section class="section friends-panel" id="friendsPanel" aria-labelledby="friendsHeading">
       <div class="section-head">
         <div><h2 id="friendsHeading">Freunde &amp; persönliche EPG-Links</h2><p class="section-desc">Neue Links anlegen, kopieren, manuell erneuern oder sperren.</p></div>
@@ -491,5 +544,6 @@
   });
 })();
 </script>
+<script src="diagnostics.js" defer></script>
 </body>
 </html>
