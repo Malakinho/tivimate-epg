@@ -1,0 +1,99 @@
+name: EPG Fehlerüberwachung
+
+on:
+  workflow_run:
+    workflows:
+      - EPG automatisch aktualisieren
+    types:
+      - completed
+  schedule:
+    - cron: '13 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+  issues: write
+
+concurrency:
+  group: epg-monitor
+  cancel-in-progress: false
+
+jobs:
+  diagnose:
+    if: github.event_name != 'workflow_run' || (github.event.workflow_run.head_repository.full_name == github.repository && github.event.workflow_run.head_branch == 'main')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Aktualisierungen überwachen und bei Bedarf ein GitHub-Issue öffnen
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const {owner, repo} = context.repo;
+            const title = "EPG-Monitor: Aktualisierung prüfen";
+            const workflowUrl = "https://github.com/" + owner + "/" + repo + "/actions/workflows/update.yml";
+            // There must be only one open monitor issue. Keep unrelated user
+            // issues (friend links and approval requests) entirely untouched.
+            const response = await github.rest.actions.listWorkflowRuns({
+              owner, repo, workflow_id: "update.yml", branch: "main", per_page: 50
+            });
+            const runs = response.data.workflow_runs || [];
+            const lastCompleted = runs.find(run => run.status === "completed");
+            const lastSuccess = runs.find(run =>
+              run.status === "completed" && run.conclusion === "success");
+            const ageHours = lastSuccess
+              ? (Date.now() - Date.parse(lastSuccess.updated_at)) / 3600000
+              : Infinity;
+            const failed = Boolean(lastCompleted
+              && ["failure", "timed_out", "cancelled", "action_required"].includes(lastCompleted.conclusion)
+              && (!lastSuccess || Date.parse(lastCompleted.updated_at) > Date.parse(lastSuccess.updated_at)));
+            const stale = ageHours >= 6;
+            const issues = await github.paginate(github.rest.issues.listForRepo,
+              {owner, repo, state: "open", per_page: 100});
+            const existing = issues.find(issue => !issue.pull_request && issue.title === title);
+            if (failed || stale) {
+              const findings = [];
+              if (failed) {
+                findings.push("- Letzter abgeschlossener EPG-Durchlauf ist fehlgeschlagen: " +
+                  lastCompleted.html_url + " (Status: " + lastCompleted.conclusion + ")");
+              }
+              if (stale) {
+                findings.push("- Seit mindestens sechs Stunden keine erfolgreiche EPG-Aktualisierung.");
+              }
+              const body = [
+                "## Automatische EPG-Fehlerüberwachung",
+                "",
+                ...findings,
+                "",
+                "Letzter erfolgreicher Durchlauf: " +
+                  (lastSuccess ? lastSuccess.html_url : "Nicht unter den letzten 50 Durchläufen gefunden"),
+                "Letzter abgeschlossener Durchlauf: " +
+                  (lastCompleted ? lastCompleted.html_url : "Nicht verfügbar"),
+                "",
+                "Die letzte erfolgreich veröffentlichte XMLTV-Datei bleibt erhalten, ",
+                "bis ein neuer Build erfolgreich ist. [GitHub Actions prüfen](" + workflowUrl + ").",
+                "",
+                "Dieses Issue enthält absichtlich keine Zugangsdaten, Stream-IDs oder Anbieter-URLs.",
+                "Das Issue wird nach erfolgreicher Wiederherstellung automatisch geschlossen."
+              ].join("\n");
+              if (!existing) {
+                await github.rest.issues.create({owner, repo, title, body});
+                core.notice("EPG-Monitor: Neues Fehler-Issue eröffnet.");
+              } else if (existing.body !== body) {
+                await github.rest.issues.update({
+                  owner, repo, issue_number: existing.number, body
+                });
+                core.warning("EPG-Monitor: Bestehendes Fehler-Issue aktualisiert.");
+              }
+            } else if (existing) {
+              await github.rest.issues.createComment({
+                owner, repo, issue_number: existing.number,
+                body: "EPG-Monitor: Die Aktualisierung läuft wieder erfolgreich. " +
+                  (lastSuccess ? lastSuccess.html_url : workflowUrl)
+              });
+              await github.rest.issues.update({
+                owner, repo, issue_number: existing.number, state: "closed"
+              });
+              core.notice("EPG-Monitor: Fehler behoben, Issue geschlossen.");
+            } else {
+              core.info("EPG-Monitor: Letzter Build erfolgreich und weniger als sechs Stunden alt.");
+            }
