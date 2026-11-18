@@ -3,16 +3,30 @@ from __future__ import annotations
 import hashlib
 import unicodedata
 
-CATEGORY_NAMES = (
+# Existing categories may have decoration such as RAW / 60FPS suffixes.
+BASE_CATEGORY_NAMES = (
     "NETFLIX ON AIR", "ONEPLAY CINEMA", "PARAMOUNT+ ORIGINAL",
     "HULU ORIGINALS", "DISNEY+ ORIGINAL", "PEACOCK SERIE ORIGINAL",
     "HBO ORIGINAL", "CINEMANIA HOLLYWOOD", "CINEMANIA TV SHOWS",
     "NFL LIVE EVENTS", "NFL REPLAY", "NHL TEAMS", "NHL LEAGUE REPLAY",
 )
 
+# Exact requested headings. Match the whole title, not substrings:
+# "PRIME VIDEO RAW" is not the "24/7 PRIME VIDEO RAW" category, which
+# already gets its own 24/7 placeholder handling.
+EXTRA_CATEGORY_NAMES = (
+    "BUNDESLIGA REPLAY", "KIDS HD/4K", "PRIME VIDEO RAW",
+    "DISNEY+ RAW", "HULU RAW", "MAGENTA FILME 4K",
+    "MAGENTA SERIE 4K", "VODAFONE GO FILME 4K", "VIP BOX FILME",
+)
+CATEGORY_NAMES = BASE_CATEGORY_NAMES + EXTRA_CATEGORY_NAMES
+
+
 def category_is_named(label: str) -> bool:
     normalized = unicodedata.normalize("NFKC", label).upper()
-    return any(name in normalized for name in CATEGORY_NAMES)
+    heading = " ".join(normalized.strip("# \t\n\r\ufe0f").split())
+    return (any(name in normalized for name in BASE_CATEGORY_NAMES)
+            or heading in EXTRA_CATEGORY_NAMES)
 
 def named_category_ids(inventory: list[dict]) -> set[str]:
     return {str(row.get("category_id") or "").strip()
