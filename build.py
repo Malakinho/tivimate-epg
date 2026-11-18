@@ -348,15 +348,19 @@ def build() -> dict:
     with DATA.open("r", encoding="utf-8-sig", newline="") as csvfile:
         input_rows = list(csv.DictReader(csvfile))
     xtream_url = os.environ.get("XTREAM_M3U_URL", "").strip()
+    with PPV_DATA.open("r", encoding="utf-8-sig", newline="") as csvfile:
+        static_ppv_rows = list(csv.DictReader(csvfile))
     if xtream_url:
-        # Live channel names always override the static PPV export.
-        # On API failure the build stops, leaving the last published EPG online.
-        ppv_rows = current_ppv_rows(xtream_url)
-        logging.info("Live PPV names retrieved: %s channels", len(ppv_rows))
+        # PPV names update from the secure Xtream live API. Some US PPV
+        # channels lack "PPV" in their names but belong to PPV categories.
+        known_ppv_categories = {
+            str(item.get("category_id") or "").strip()
+            for item in static_ppv_rows if item.get("category_id")
+        }
+        ppv_rows = current_ppv_rows(xtream_url, known_ppv_categories)
+        logging.info("Live PPV names retrieved: %s channels (including PPV categories)", len(ppv_rows))
     else:
-        # Until the user enters the GitHub secret, keep the working static guide.
-        with PPV_DATA.open("r", encoding="utf-8-sig", newline="") as csvfile:
-            ppv_rows = list(csv.DictReader(csvfile))
+        ppv_rows = static_ppv_rows
         logging.info("Using static PPV fallback: configure XTREAM_M3U_URL secret for live updates")
     # PPV placeholders remain unchanged. 24/7 entries are only added
     # where the provider supplied no EPG ID.
