@@ -403,7 +403,7 @@ def build() -> dict:
         str(row.get("category_id") or "").strip()
         for row in full_inventory
         if (row.get("name") or "").strip().startswith("##")
-        and re.search(r"(?<!\\d)24\\s*[/\\-]\\s*7(?!\\d)", row.get("name") or "", re.I)
+        and re.search(r"(?<!\d)24\s*[/\-]\s*7(?!\d)", row.get("name") or "", re.I)
     }
     xtream_url = os.environ.get("XTREAM_M3U_URL", "").strip()
     with PPV_DATA.open("r", encoding="utf-8-sig", newline="") as csvfile:
