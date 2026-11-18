@@ -365,12 +365,15 @@
     }
   }
   function loadFriends(){
-    fetch("friends.json",{cache:"no-store"}).then(r=>{
+    const button=$("friendReload");
+    button.disabled=true;
+    setText("friendMessage","Lade aktuelle Freundeliste von GitHub Pages …");
+    fetch("friends.json?v="+Date.now(),{cache:"no-store"}).then(r=>{
       if(!r.ok)throw Error("HTTP "+r.status);
       return r.json();
     }).then(displayFriends).catch(()=>{
-      setText("friendMessage","Freundeliste konnte nicht geladen werden. Seite neu laden.");
-    });
+      setText("friendMessage","Freundeliste konnte nicht geladen werden. Bitte GitHub-Veröffentlichung prüfen und danach erneut versuchen.");
+    }).finally(()=>{button.disabled=false});
   }
   function populateCategories(){
     const counts=new Map();
