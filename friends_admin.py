@@ -145,8 +145,9 @@ def apply_change(data):
         "sha": current["sha"],
         "branch": "main",
     })
-    # A GITHUB_TOKEN commit does not trigger a separate push workflow.
-    api("/actions/workflows/update.yml/dispatches", "POST", {"ref": "main"})
+    # A GITHUB_TOKEN commit does not trigger a push workflow; dispatch the
+    # fast link-only publisher explicitly (no programme regeneration).
+    api("/actions/workflows/publish-links.yml/dispatches", "POST", {"ref": "main"})
     return result
 
 
