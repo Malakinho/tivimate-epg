@@ -11,6 +11,7 @@ on:
       - 'named_categories.py'
       - 'test_named_categories.py'
       - 'test_name_normalization.py'
+      - 'test_dashboard_sources.py'
       - 'test_ppv_categories.py'
       - 'test_always_on_categories.py'
       - 'provider_epg.py'
@@ -44,7 +45,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: PPV-Erkennung für USA und Deutschland testen
-        run: python -m unittest -v test_ppv_categories.py test_always_on_categories.py test_named_categories.py test_name_normalization.py
+        run: python -m unittest -v test_ppv_categories.py test_always_on_categories.py test_named_categories.py test_name_normalization.py test_dashboard_sources.py
       - name: XMLTV aus DE und GR erzeugen
         env:
           XTREAM_M3U_URL: ${{ secrets.XTREAM_M3U_URL }}
