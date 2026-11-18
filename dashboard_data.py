@@ -86,7 +86,7 @@ def make_dashboard(*, inventory_path: Path, output_path: Path, ppv_rows,
             # including US event channels without PPV in their visible names.
             continue
         provider_id = (rec.get("epg_channel_id") or "").strip()
-        if (live_all_placeholders and not id_valid(provider_id)
+        if (live_all_placeholders
                 and category_id in live_always_ids
                 and (name in static_always_names
                      or ALWAYS_ON.search(name) or ALWAYS_ON.search(cat))):

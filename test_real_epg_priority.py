@@ -101,6 +101,34 @@ class RealEpgPriorityTests(unittest.TestCase):
         self.assertNotIn("ppv.live.unknown", public)
         self.assertNotIn("named.static.missing", public)
 
+    def test_dashboard_live_real_id_does_not_duplicate_old_inventory_row(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            inv = Path(tmp) / "inventory.csv"
+            out = Path(tmp) / "dashboard.json"
+            with inv.open("w", encoding="utf-8", newline="") as handle:
+                writer = csv.DictWriter(handle, fieldnames=["name", "epg_channel_id", "category_id"])
+                writer.writeheader()
+                writer.writerow({"name": "## COSMOTE FILM 24/7", "epg_channel_id": "", "category_id": "1470"})
+                writer.writerow({"name": "GR: MOVIE OLD", "epg_channel_id": "Provider.gr",
+                                 "category_id": "1470"})
+            report = make_dashboard(
+                inventory_path=inv, output_path=out,
+                ppv_rows=[],
+                always_on_rows=[{
+                    "id": "always.old", "name": "GR: MOVIE NEW",
+                    "category_id": "1470", "source": "live",
+                    "epg_channel_id": "Provider.gr"}],
+                named_rows=[], by_id=self.by_id,
+                by_name=self.by_name, by_compact=self.by_compact,
+                aliases={}, feeds=self.feeds, clean_name=clean_name,
+                market_of=market_of, best=lambda *args: None,
+                id_valid=id_valid, live_ppv=True, live_all_placeholders=True,
+                static_always_names={"GR: MOVIE OLD"},
+                real_placeholder_ids={"always.old"})
+            self.assertEqual(report["total"], 1)
+            self.assertEqual(report["rows"][0][0], "GR: MOVIE NEW")
+            self.assertEqual(report["rows"][0][4:6], ["always.old", "programm"])
+
     def test_provider_xmltv_copies_only_real_titles_to_stable_alias(self):
         doc = (
             '<tv><channel id="Provider.gr"><display-name>Provider</display-name></channel>'
