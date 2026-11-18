@@ -19,7 +19,7 @@ class NamedCategoryTests(unittest.TestCase):
         rows = static_named_rows(inventory, ids)
         self.assertEqual(len(CATEGORY_NAMES), 13)
         self.assertEqual(len(ids), 13)
-        self.assertGreaterEqual(len(rows), 784)
+        self.assertGreaterEqual(len(rows), 780)  # Duplicate names within a category share one XMLTV ID.
         self.assertEqual(len({r["id"] for r in rows}), len(rows))
         self.assertTrue(all(not r["name"].startswith("##") for r in rows))
         self.assertEqual(rows, static_named_rows(inventory, ids))
