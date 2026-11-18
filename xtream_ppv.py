@@ -6,6 +6,8 @@ Neither the credentials nor the provider URLs are written to the EPG.
 import hashlib
 import json
 import re
+
+PPV_LABEL = re.compile(r"(?:\bPPV\b|\bPPV(?=\d)|ᴾᴾⱽ)", re.I)
 from urllib.parse import parse_qs, urlencode, urlsplit, urlunsplit
 from urllib.request import Request, urlopen
 
@@ -73,7 +75,7 @@ def current_ppv_rows(secret_url: str, known_ppv_category_ids=None):
         category_name = category_names.get(category_id, "")
         if not title or not stream_id:
             continue
-        if not (re.search(r"\bPPV\b", title, re.I)
+        if not (PPV_LABEL.search(title)
                 or category_id in current_ppv_ids
                 or (category_id in known and category_id not in category_names)):
             continue
