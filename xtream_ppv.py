@@ -83,7 +83,7 @@ def current_ppv_rows(secret_url: str, known_ppv_category_ids=None):
         # Stable for this Xtream stream ID, even when its name changes.
         # Do not publish raw stream IDs or credentials.
         opaque_id = hashlib.sha256((parsed.netloc.lower() + ":" + stream_id).encode("utf-8")).hexdigest()[:22]
-        is_us = (bool(re.search(r"^(?:US\s*[:(]|\\(US\\))", title, re.I))
+        is_us = (bool(re.search(r"^(?:US\s*[:(]|\(US\))", title, re.I))
                  or bool(re.search(r"\b(?:US|USA)\b", category_name, re.I)))
         result.append({
             "id": "ppv.live." + opaque_id, "name": title,
