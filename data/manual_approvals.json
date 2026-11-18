@@ -1,6 +1,11 @@
 {
   "approved": [
     {
+      "name": "UK: SKY SPORT F1 ᴿᴬᵂ",
+      "category_id": "2032",
+      "provider_id": "skysportsf1.uk"
+    },
+    {
       "name": "UK: SKY SPORT NEWS ᴿᴬᵂ",
       "category_id": "2032",
       "provider_id": "skysportsnews.uk"
