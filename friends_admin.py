@@ -13,6 +13,7 @@ import re
 import secrets
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 REPO = os.environ["GITHUB_REPOSITORY"]
@@ -49,7 +50,17 @@ def post_comment(message):
 
 
 def close_issue():
-    api("/issues/" + str(ISSUE["number"]), "PATCH", {"state": "closed"})
+    # The owner might manually close the issue before Actions finishes.
+    # Avoid marking an otherwise successful creation as failed in this case.
+    path = "/issues/" + str(ISSUE["number"])
+    if api(path).get("state") == "closed":
+        return
+    try:
+        api(path, "PATCH", {"state": "closed"})
+    except HTTPError as error:
+        if error.code == 422 and api(path).get("state") == "closed":
+            return
+        raise
 
 
 def parse_request():
