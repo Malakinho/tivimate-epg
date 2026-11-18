@@ -58,22 +58,7 @@ def make_dashboard(*, inventory_path: Path, output_path: Path, ppv_rows,
     def add(name, category, category_id, user_id, epg_id, status, region, kind):
         claimable = (status in ("ohne", "pruefen") and id_valid(user_id)
                      and user_id.casefold() in available_ids and bool(category_id))
-        # Keep published personal.* XMLTV IDs stable; changing them would break
-        # manual EPG assignments. Show the real programme source separately.
-        source_id, source_name, source_feed = "", "", ""
-        if status == "programm" and epg_id:
-            key = epg_id.casefold()
-            alias = alias_keys.get(key)
-            channel = aliases.get(alias) if alias else by_id.get(key)
-            if channel is not None:
-                source_id = channel.id
-                source_name = channel.names[0] if channel.names else ""
-                source_feed = feeds[channel.feed].label
-            elif key in {cid.casefold() for cid in provider_fallback_ids.values()}:
-                source_id = epg_id
-                source_feed = "Anbieter-XMLTV"
-        rows.append([name, category, category_id, user_id, epg_id, status,
-                     region, kind, claimable, source_id, source_name, source_feed])
+        rows.append([name, category, category_id, user_id, epg_id, status, region, kind, claimable])
         counters[status] += 1
 
     for rec in inventory:
@@ -223,8 +208,7 @@ def make_dashboard(*, inventory_path: Path, output_path: Path, ppv_rows,
         "counts": dict(counters),
         "total": len(rows),
         "fields": ["name", "category", "category_id", "provider_id",
-                   "xmltv_id", "status", "region", "kind", "claimable",
-                   "source_id", "source_name", "source_feed"],
+                   "xmltv_id", "status", "region", "kind", "claimable"],
         "rows": rows,
         "note": "Treffer beziehen sich auf unsere XMLTV-Daten, nicht auf automatische Zuordnung im IPTV-Player.",
     }

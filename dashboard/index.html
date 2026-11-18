@@ -181,7 +181,7 @@
       <div class="table-meta"><span id="shown">Lade Senderdaten …</span><span id="lastUpdated">–</span></div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Sendername</th><th>Kategorie</th><th>EPG-Status</th><th>Anbieter-ID</th><th>EPG-Quelle</th><th>XMLTV-ID</th><th>Aktion</th></tr></thead>
+          <thead><tr><th>Sendername</th><th>Kategorie</th><th>EPG-Status</th><th>Anbieter-ID</th><th>XMLTV-ID</th><th>Aktion</th></tr></thead>
           <tbody id="tbody"></tbody>
         </table>
         <div id="state" role="status">Die Senderliste wird geladen …</div>
@@ -189,7 +189,7 @@
       <div class="footer"><div id="pageSummary">–</div><div class="pages"><button class="btn" id="prev">← Zurück</button><span id="pageLabel">–</span><button class="btn" id="next">Weiter →</button></div></div>
     </section>
     <div class="hint">
-      <strong>Was bedeutet der Status?</strong> „EPG-Quelle“ zeigt die tatsächliche Quell-ID (z. B. zdf.de) und den dort hinterlegten Sendernamen. „XMLTV-ID“ ist unsere stabile technische Kennung. Ein plausibler Quellname ist keine Garantie, dass alle Sendungen zeitlich richtig sind. „Mit EPG“ bedeutet, dass wir passende Programmdaten in der XMLTV gefunden haben – nicht zwingend, dass TiviMate oder iMPlayer die Zuordnung automatisch vorgenommen hat. „Zuordnung prüfen“ kennzeichnet eine vorhandene EPG-ID, deren Programmsender möglicherweise nicht zum Stream passt. „Platzhalter“ zeigt bei PPV, 24/7 und Sonderkategorien den Sendernamen als Programmtitel. <br>
+      <strong>Was bedeutet der Status?</strong> „Mit EPG“ bedeutet, dass wir passende Programmdaten in der XMLTV gefunden haben – nicht zwingend, dass TiviMate oder iMPlayer die Zuordnung automatisch vorgenommen hat. „Zuordnung prüfen“ kennzeichnet eine vorhandene EPG-ID, deren Programmsender möglicherweise nicht zum Stream passt. „Platzhalter“ zeigt bei PPV, 24/7 und Sonderkategorien den Sendernamen als Programmtitel. <br>
       <span style="display:inline-block;margin-top:5px">Die Webseite selbst speichert keine Zugangsdaten. Du kannst eine vorhandene Anbieter-ID per <strong>„ID übernehmen“</strong> zur Freigabe auf GitHub öffnen. Nur der angemeldete <strong>Repository-Inhaber</strong> kann sie durch „Submit new issue“ dauerhaft bestätigen. Eine Übernahme wird nur angeboten, wenn unsere XMLTV unter dieser ID bereits echte Programme enthält. Die Bestätigung ist als GitHub-Issue öffentlich sichtbar. <a href="https://github.com/Malakinho/tivimate-epg/actions/workflows/update.yml" target="_blank" rel="noopener noreferrer">GitHub-Aktualisierungen ansehen</a>.</span>
     </div>
   </main>
@@ -199,9 +199,9 @@
   "use strict";
   const $ = function(id){return document.getElementById(id)};
   const format = new Intl.NumberFormat("de-DE");
-  const names = ["Sendername","Kategorie","Kategorie-ID","Anbieter-EPG-ID","XMLTV-ID","EPG-Status","Region","Art","EPG-Quelle-ID","EPG-Quelle-Name","EPG-Quelle-Feed"];
+  const names = ["Sendername","Kategorie","Kategorie-ID","Anbieter-EPG-ID","XMLTV-ID","EPG-Status","Region","Art"];
   const statusNames = {programm:"Mit EPG",platzhalter:"Platzhalter",ohne:"Ohne EPG",pruefen:"Zuordnung prüfen"};
-  const field = {name:0,cat:1,catId:2,provider:3,xml:4,status:5,region:6,kind:7,claimable:8,sourceId:9,sourceName:10,sourceFeed:11};
+  const field = {name:0,cat:1,catId:2,provider:3,xml:4,status:5,region:6,kind:7,claimable:8};
   let data = [],filtered = [],mode = "all",page = 0;
   // null = alle Kategorien, Set() = keine Kategorien.
   let selectedCategories = null;
@@ -230,29 +230,6 @@
         st.appendChild(tag(statusNames[r[field.status]]||"Unbekannt",r[field.status]==="programm"?"ok":r[field.status]==="platzhalter"?"placeholder":r[field.status]==="pruefen"?"pruefen":"no"));
         tr.appendChild(st);
         cell(tr,r[field.provider],"id",r[field.provider]);
-        const source=document.createElement("td");
-        source.className="id";
-        if(r[field.sourceId]){
-          source.textContent=r[field.sourceId];
-          const name=String(r[field.sourceName]||"").trim();
-          const feed=String(r[field.sourceFeed]||"").trim();
-          if(name||feed){
-            const details=document.createElement("div");
-            details.style.cssText="font:11px system-ui,sans-serif;color:#9eb0c4;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis";
-            details.textContent=[name,feed].filter(Boolean).join(" · ");
-            details.title=details.textContent;
-            source.appendChild(details);
-          }
-        } else if(r[field.status]==="platzhalter"){
-          source.textContent="Sendername";
-          const details=document.createElement("div");
-          details.style.cssText="font:11px system-ui,sans-serif;color:#9eb0c4;margin-top:3px";
-          details.textContent="Automatischer Platzhalter";
-          source.appendChild(details);
-        } else {
-          source.textContent="–";
-        }
-        tr.appendChild(source);
         cell(tr,r[field.xml],"id",r[field.xml]);
         const action=document.createElement("td");
         if(r[field.claimable]&&r[field.provider]&&!r[field.xml]){
@@ -303,7 +280,7 @@
         const pid=String(r[field.provider]||"").trim(),xid=String(r[field.xml]||"").trim();
         if(!pid||xid||["TS","N/A","NONE","NULL","0","-"].includes(pid.toUpperCase()))return false;
       } else if(status&&st!==status)return false;
-      if(search&&![r[0],r[1],r[2],r[3],r[4],r[field.sourceId],r[field.sourceName],r[field.sourceFeed]].some(function(v){return String(v||"").toLocaleLowerCase("de").includes(search)}))return false;
+      if(search&&![r[0],r[1],r[2],r[3],r[4]].some(function(v){return String(v).toLocaleLowerCase("de").includes(search)}))return false;
       return true;
     });
     page=0;render();
@@ -316,7 +293,7 @@
   function exportCsv(){
     if(!filtered.length)return;
     const out=[names.map(escapeCsv).join(";")];
-    for(const row of filtered)out.push([0,1,2,3,4,5,6,7,9,10,11].map(function(i){return escapeCsv(row[i])}).join(";"));
+    for(const row of filtered)out.push(row.slice(0,8).map(escapeCsv).join(";"));
     const blob=new Blob(["\ufeff",out.join("\r\n")],{type:"text/csv;charset=utf-8"});
     const url=URL.createObjectURL(blob),a=document.createElement("a");
     a.href=url;a.download="epg-senderliste-"+mode+"-"+new Date().toISOString().slice(0,10)+".csv";
