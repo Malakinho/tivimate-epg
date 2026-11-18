@@ -30,6 +30,7 @@ from xml.etree import ElementTree as ET
 from xtream_ppv import current_ppv_rows
 from named_categories import named_category_ids, static_named_rows
 from name_matching import compact_index, matching_candidates
+from placeholder_history import previous_state, write_bindings
 from dashboard_data import make_dashboard
 from provider_epg import fetch_provider_xmltv, provider_coverage, emit_provider_programmes
 
@@ -396,32 +397,58 @@ def build() -> dict:
     with (ROOT / "data" / "inventory.csv").open("r", encoding="utf-8-sig", newline="") as csvfile:
         full_inventory = list(csv.DictReader(csvfile))
     named_ids = named_category_ids(full_inventory)
+    # Whole 24/7 categories are followed by stream ID, even when individual
+    # stream names do not contain 24/7 (e.g. COSMOTE FILM 1).
+    always_category_ids = {
+        str(row.get("category_id") or "").strip()
+        for row in full_inventory
+        if (row.get("name") or "").strip().startswith("##")
+        and re.search(r"(?<!\\d)24\\s*[/\\-]\\s*7(?!\\d)", row.get("name") or "", re.I)
+    }
     xtream_url = os.environ.get("XTREAM_M3U_URL", "").strip()
     with PPV_DATA.open("r", encoding="utf-8-sig", newline="") as csvfile:
         static_ppv_rows = list(csv.DictReader(csvfile))
+    # Static CSV data is a fallback if no authenticated live provider exists.
+    # Once live Xtream data is available, never publish stale CSV titles as
+    # if they were current sender names.
+    with ALWAYS_ON_DATA.open("r", encoding="utf-8-sig", newline="") as csvfile:
+        always_on_static = extend_always_on_categories(list(csv.DictReader(csvfile)),
+                                                       full_inventory)
+    previous_bindings, previous_aliases = {}, {}
     if xtream_url:
-        # PPV names update from the secure Xtream live API. Some US PPV
-        # channels lack "PPV" in their names but belong to PPV categories.
+        previous_bindings, previous_aliases = previous_state()
+        legacy_ids = {
+            ("always", str(row.get("category_id") or ""), row["name"]): row["id"]
+            for row in always_on_static if row.get("name") and row.get("id")
+        }
+        legacy_ids.update({
+            ("named", row["category_id"], row["name"]): row["id"]
+            for row in static_named_rows(full_inventory, named_ids)
+        })
+        # Prefer the ID actually offered by the last published XMLTV guide.
+        legacy_ids.update(previous_aliases)
         known_ppv_categories = {
             str(item.get("category_id") or "").strip()
             for item in static_ppv_rows if item.get("category_id")
         }
-        ppv_rows, live_named_rows = current_ppv_rows(xtream_url, known_ppv_categories, named_ids)
-        logging.info("Live PPV names retrieved: %s channels (including PPV categories)", len(ppv_rows))
+        ppv_rows, live_named_rows, live_always_rows = current_ppv_rows(
+            xtream_url, known_ppv_categories, named_ids,
+            always_category_ids=always_category_ids,
+            always_names={(str(row.get("category_id") or ""), row["name"])
+                          for row in always_on_static if row.get("name")},
+            legacy_ids=legacy_ids, previous_bindings=previous_bindings,
+        )
+        # All placeholder programme titles now come from the same current
+        # Xtream snapshot as the PPV titles.
+        named_rows, always_on_rows = live_named_rows, live_always_rows
+        logging.info("Current placeholder names: PPV=%d, named=%d, 24/7=%d",
+                     len(ppv_rows), len(named_rows), len(always_on_rows))
     else:
-        live_named_rows = []
+        live_named_rows, live_always_rows = [], []
         ppv_rows = static_ppv_rows
-        logging.info("Using static PPV fallback: configure XTREAM_M3U_URL secret for live updates")
-    # PPV placeholders remain unchanged. 24/7 entries are only added
-    # where the provider supplied no EPG ID.
-    with ALWAYS_ON_DATA.open("r", encoding="utf-8-sig", newline="") as csvfile:
-        always_on_rows = list(csv.DictReader(csvfile))
-    # Use full inventory for 24/7 and requested movie/sports categories.
-    always_on_rows = extend_always_on_categories(always_on_rows, full_inventory)
-    live_category_ids = {r["category_id"] for r in live_named_rows}
-    named_rows = live_named_rows + static_named_rows(full_inventory, named_ids - live_category_ids)
-    logging.info("Sendername-EPG: %d categories, %d live / %d static channels",
-                 len(named_ids), len(live_named_rows), len(named_rows) - len(live_named_rows))
+        always_on_rows = always_on_static
+        named_rows = static_named_rows(full_inventory, named_ids)
+        logging.info("Static fallback: no XTREAM_M3U_URL configured")
     placeholder_rows = ppv_rows + always_on_rows + named_rows
     with tempfile.TemporaryDirectory() as temp:
         temp_dir = Path(temp)
@@ -737,6 +764,8 @@ def build() -> dict:
             aliases=aliases, feeds=feeds,
             clean_name=clean_name, market_of=market_of, best=best, id_valid=id_valid,
             live_ppv=bool(xtream_url),
+            live_all_placeholders=bool(xtream_url), named_category_ids=named_ids,
+            static_always_names={r["name"] for r in always_on_static if r.get("name")},
             provider_fallback_ids=provider_fallback_ids,
             manual_approvals=manual_approvals,
         )
@@ -744,6 +773,14 @@ def build() -> dict:
         result["dashboard_counts"] = dashboard["counts"]
         shutil.copyfile(ROOT / "dashboard" / "index.html", OUT_DIR / "index.html")
         shutil.copyfile(ROOT / "dashboard" / "m3u.html", OUT_DIR / "m3u.html")
+        if xtream_url:
+            result["placeholder_stream_bindings"] = write_bindings(
+                OUT_DIR / "placeholder-bindings.json",
+                previous_bindings, live_named_rows, live_always_rows)
+        else:
+            # Do not publish an old stream-binding snapshot when live access
+            # is disabled and no current stream verification was possible.
+            (OUT_DIR / "placeholder-bindings.json").unlink(missing_ok=True)
         (OUT_DIR / "status.json").write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
         logging.info("DONE: %s channels + %s aliases, %s programme entries, %s friend copies", len(by_id), len(aliases), total_programmes, active_friends)
         return result

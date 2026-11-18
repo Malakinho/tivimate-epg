@@ -10,11 +10,15 @@ import re
 from named_categories import category_is_named
 
 PPV_LABEL = re.compile(r"(?:\bPPV\b|\bPPV(?=\d)|ᴾᴾⱽ)", re.I)
+ALWAYS_LABEL = re.compile(r"(?<!\d)24\s*[/\-]\s*7(?!\d)|\b24\s*H\b", re.I)
+BAD_EPG_IDS = {"", "TS", "N/A", "NONE", "NULL", "0", "-"}
 from urllib.parse import parse_qs, urlencode, urlsplit, urlunsplit
 from urllib.request import Request, urlopen
 
 
-def current_ppv_rows(secret_url: str, known_ppv_category_ids=None, named_category_ids=None):
+def current_ppv_rows(secret_url: str, known_ppv_category_ids=None, named_category_ids=None,
+                     always_category_ids=None, always_names=None, legacy_ids=None,
+                     previous_bindings=None):
     parsed = urlsplit(secret_url.strip())
     query = parse_qs(parsed.query, keep_blank_values=True)
     username = query.get("username", [""])[0]
@@ -69,7 +73,27 @@ def current_ppv_rows(secret_url: str, known_ppv_category_ids=None, named_categor
     result = []
     seen = set()
     named_rows, named_seen = [], set()
+    always_rows, always_seen = [], set()
+    used_placeholder_ids = set()
     named_ids = {str(x).strip() for x in (named_category_ids or ())}
+    always_ids = {str(x).strip() for x in (always_category_ids or ())}
+    always_names = set(always_names or ())
+    legacy_ids = legacy_ids or {}
+    previous_bindings = previous_bindings or {}
+
+    def stable_id(kind, fingerprint, category_id, title):
+        old = previous_bindings.get(fingerprint, {})
+        old_id = old.get("id") if old.get("kind") == kind else None
+        if not old_id:
+            old_id = legacy_ids.get((kind, category_id, title))
+        prefix = "named.live." if kind == "named" else "always.live."
+        # Two distinct streams can share the same visible name. Only one may
+        # reuse its old name-based static ID; the other receives a unique ID.
+        candidate = old_id or (prefix + fingerprint)
+        if candidate in used_placeholder_ids:
+            candidate = prefix + fingerprint
+        used_placeholder_ids.add(candidate)
+        return candidate
     for channel in streams:
         if not isinstance(channel, dict):
             continue
@@ -82,13 +106,21 @@ def current_ppv_rows(secret_url: str, known_ppv_category_ids=None, named_categor
         is_ppv = bool(PPV_LABEL.search(title)
                       or category_id in current_ppv_ids
                       or (category_id in known and category_id not in category_names))
-        is_named = (named_category_ids is not None
-                    and (category_id in named_ids or category_is_named(category_name)))
-        if not (is_ppv or is_named):
-            continue
         # Stable for this Xtream stream ID even when the name changes.
         # Never publish raw stream IDs or credentials.
         opaque_id = hashlib.sha256((parsed.netloc.lower() + ":" + stream_id).encode("utf-8")).hexdigest()[:22]
+        is_named = (named_category_ids is not None
+                    and (category_id in named_ids or category_is_named(category_name)))
+        saved = previous_bindings.get(opaque_id, {})
+        no_provider_epg = str(channel.get("epg_channel_id") or "").strip().upper() in BAD_EPG_IDS
+        is_always = (always_category_ids is not None and no_provider_epg
+                     and (category_id in always_ids
+                          or ALWAYS_LABEL.search(category_name)
+                          or ALWAYS_LABEL.search(title)
+                          or (category_id, title) in always_names
+                          or saved.get("kind") == "always"))
+        if not (is_ppv or is_named or is_always):
+            continue
         is_us = (bool(re.search(r"^(?:US\s*[:(]|\(US\))", title, re.I))
                  or bool(re.search(r"\b(?:US|USA)\b", category_name, re.I)))
         if is_ppv and stream_id not in seen:
@@ -101,11 +133,22 @@ def current_ppv_rows(secret_url: str, known_ppv_category_ids=None, named_categor
         elif is_named and stream_id not in named_seen:
             named_seen.add(stream_id)
             named_rows.append({
-                "id": "named.live." + opaque_id, "name": title,
+                "id": stable_id("named", opaque_id, category_id, title), "name": title,
                 "category_id": category_id, "category": category_name or "Sendername",
                 "region": "US" if is_us else "DE/International", "source": "live",
+                "fingerprint": opaque_id,
+            })
+        elif is_always and stream_id not in always_seen:
+            always_seen.add(stream_id)
+            always_rows.append({
+                "id": stable_id("always", opaque_id, category_id, title), "name": title,
+                "category_id": category_id, "category": category_name or "24/7",
+                "region": "US" if is_us else "DE/International", "source": "live",
+                "fingerprint": opaque_id,
             })
 
     if not result:
         raise RuntimeError("Xtream API returned no PPV channels; published EPG remains unchanged.")
+    if always_category_ids is not None:
+        return result, named_rows, always_rows
     return (result, named_rows) if named_category_ids is not None else result

@@ -21,7 +21,9 @@ def make_dashboard(*, inventory_path: Path, output_path: Path, ppv_rows,
                    always_on_rows, named_rows, by_id, by_name, aliases, feeds,
                    by_compact=None,
                    clean_name, market_of, best, id_valid, live_ppv: bool,
-                   provider_fallback_ids=None, manual_approvals=None):
+                   provider_fallback_ids=None, manual_approvals=None,
+                   live_all_placeholders=False, named_category_ids=None,
+                   static_always_names=None):
     """Data is informational; a source match does not guarantee player assignment."""
     with inventory_path.open(encoding="utf-8-sig", newline="") as handle:
         inventory = list(csv.DictReader(handle))
@@ -41,6 +43,9 @@ def make_dashboard(*, inventory_path: Path, output_path: Path, ppv_rows,
                        for r in named_rows if r.get("source") == "static"}
     live_named_ids = {str(r.get("category_id") or "").strip()
                       for r in named_rows if r.get("source") == "live"}
+    if live_all_placeholders:
+        live_named_ids.update(str(x) for x in (named_category_ids or ()))
+    static_always_names = static_always_names or set()
     alias_keys = {a.casefold(): a for a in aliases}
     # Whitelist is limited to checked discrepancies in the
     # provider-ID-present / XMLTV-ID-empty cohort. Other channels are untouched.
@@ -78,6 +83,12 @@ def make_dashboard(*, inventory_path: Path, output_path: Path, ppv_rows,
             # including US event channels without PPV in their visible names.
             continue
         provider_id = (rec.get("epg_channel_id") or "").strip()
+        if (live_all_placeholders and not id_valid(provider_id)
+                and (name in static_always_names
+                     or ALWAYS_ON.search(name) or ALWAYS_ON.search(cat))):
+            # Real-time 24/7 names supersede stale static inventory names.
+            # A channel with a genuine provider EPG ID remains inspectable.
+            continue
         # Classify by both the sender name and its provider category.
         # Some event/24/7 streams have generic titles without those words.
         is_ppv = bool(PPV.search(name) or PPV.search(cat))
@@ -195,7 +206,19 @@ def make_dashboard(*, inventory_path: Path, output_path: Path, ppv_rows,
                     "live-ppv", "", epg_id, "platzhalter",
                     (ppv.get("region") or "DE/International"), "PPV")
 
-    # Append current live streams only: static entries already appeared above.
+    # Append live 24/7 placeholders. Their XMLTV IDs remain stable even
+    # if Xtream later changes the stream name.
+    for entry in always_on_rows:
+        if entry.get("source") != "live":
+            continue
+        name = (entry.get("name") or "").strip()
+        epg_id = (entry.get("id") or "").strip()
+        if name and epg_id:
+            add(name, entry.get("category") or "24/7",
+                str(entry.get("category_id") or ""), "", epg_id, "platzhalter",
+                entry.get("region") or market_of(name), "24/7")
+
+    # Append current named-category streams only: static records are superseded.
     for entry in named_rows:
         if entry.get("source") != "live":
             continue
