@@ -438,11 +438,24 @@ def build() -> dict:
                           for row in always_on_static if row.get("name")},
             legacy_ids=legacy_ids, previous_bindings=previous_bindings,
         )
-        # All placeholder programme titles now come from the same current
-        # Xtream snapshot as the PPV titles.
-        named_rows, always_on_rows = live_named_rows, live_always_rows
-        logging.info("Current placeholder names: PPV=%d, named=%d, 24/7=%d",
-                     len(ppv_rows), len(named_rows), len(always_on_rows))
+        # Prefer current stream names. Retain old static placeholders only
+        # for whole categories missing from the live API so previously
+        # published EPG entries do not suddenly vanish.
+        live_named_categories = {r["category_id"] for r in live_named_rows}
+        live_always_categories = {r["category_id"] for r in live_always_rows}
+        published_always_ids = {r["id"] for r in live_always_rows}
+        named_static_fallback = static_named_rows(
+            full_inventory, named_ids - live_named_categories)
+        always_static_fallback = [
+            r for r in always_on_static
+            if str(r.get("category_id") or "") not in live_always_categories
+            and r.get("id") not in published_always_ids
+        ]
+        named_rows = live_named_rows + named_static_fallback
+        always_on_rows = live_always_rows + always_static_fallback
+        logging.info("Current placeholder names: PPV=%d, named=%d live + %d fallback, 24/7=%d live + %d fallback",
+                     len(ppv_rows), len(live_named_rows), len(named_static_fallback),
+                     len(live_always_rows), len(always_static_fallback))
     else:
         live_named_rows, live_always_rows = [], []
         ppv_rows = static_ppv_rows

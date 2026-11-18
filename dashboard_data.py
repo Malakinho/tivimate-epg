@@ -43,8 +43,8 @@ def make_dashboard(*, inventory_path: Path, output_path: Path, ppv_rows,
                        for r in named_rows if r.get("source") == "static"}
     live_named_ids = {str(r.get("category_id") or "").strip()
                       for r in named_rows if r.get("source") == "live"}
-    if live_all_placeholders:
-        live_named_ids.update(str(x) for x in (named_category_ids or ()))
+    live_always_ids = {str(r.get("category_id") or "").strip()
+                       for r in always_on_rows if r.get("source") == "live"}
     static_always_names = static_always_names or set()
     alias_keys = {a.casefold(): a for a in aliases}
     # Whitelist is limited to checked discrepancies in the
@@ -84,6 +84,7 @@ def make_dashboard(*, inventory_path: Path, output_path: Path, ppv_rows,
             continue
         provider_id = (rec.get("epg_channel_id") or "").strip()
         if (live_all_placeholders and not id_valid(provider_id)
+                and category_id in live_always_ids
                 and (name in static_always_names
                      or ALWAYS_ON.search(name) or ALWAYS_ON.search(cat))):
             # Real-time 24/7 names supersede stale static inventory names.

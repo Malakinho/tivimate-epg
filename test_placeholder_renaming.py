@@ -109,6 +109,34 @@ class PlaceholderRenameTest(unittest.TestCase):
         self.assertFalse(named)
         self.assertEqual([r["name"] for r in always], ["GR: FILM PLACEHOLDER"])
 
+    def test_dashboard_keeps_static_placeholders_for_unavailable_categories(self):
+        from types import SimpleNamespace
+        with tempfile.TemporaryDirectory() as tmp:
+            inv = Path(tmp) / "inventory.csv"
+            output = Path(tmp) / "dashboard.json"
+            with inv.open("w", newline="", encoding="utf-8") as file:
+                writer = csv.DictWriter(file, fieldnames=["name", "epg_channel_id", "category_id"])
+                writer.writeheader()
+                for name, cat in (("## 24/7 MOVIES", "619"),
+                                  ("US: OLD FILM", "619"),
+                                  ("## VIP BOX FILME", "332"),
+                                  ("DE: BOX OLD", "332")):
+                    writer.writerow({"name": name, "epg_channel_id": "", "category_id": cat})
+            report = make_dashboard(
+                inventory_path=inv, output_path=output, ppv_rows=[],
+                always_on_rows=[{"id": "always.old", "name": "US: OLD FILM",
+                                 "category_id": "619"}],
+                named_rows=[{"id": "named.static.old", "name": "DE: BOX OLD",
+                             "category_id": "332", "source": "static"}],
+                by_id={}, by_name={}, aliases={}, feeds=[], by_compact={},
+                clean_name=clean_name, market_of=market_of,
+                best=lambda *args: None, id_valid=id_valid, live_ppv=True,
+                live_all_placeholders=True, named_category_ids={"332"},
+                static_always_names={"US: OLD FILM"})
+            self.assertEqual({row[0] for row in report["rows"]},
+                             {"US: OLD FILM", "DE: BOX OLD"})
+            self.assertTrue(all(row[5] == "platzhalter" for row in report["rows"]))
+
     def test_dashboard_does_not_show_stale_legacy_24_7_title(self):
         from types import SimpleNamespace
         with tempfile.TemporaryDirectory() as tmp:
