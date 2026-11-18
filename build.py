@@ -50,12 +50,22 @@ SOURCES = [
     ("GR-FREEEPG", "GR", "https://free-epg.de/api/epg/gr.xml.gz"),
     ("DE-XMLTVLIVE", "DE", "https://xmltv.live/epg/de.xml.gz"),
     ("GR-XMLTVLIVE", "GR", "https://xmltv.live/epg/gr.xml.gz"),
+    # Country-specific optional feeds. Only genuinely relevant channels from
+    # these large sources are selected into the final merged XMLTV.
+    ("FR-IPTV", "FR", "https://iptv-epg.org/files/epg-fr.xml.gz"),
+    ("IT-IPTV", "IT", "https://iptv-epg.org/files/epg-it.xml.gz"),
+    ("PL-IPTV", "PL", "https://iptv-epg.org/files/epg-pl.xml.gz"),
+    ("HR-IPTV", "HR", "https://iptv-epg.org/files/epg-hr.xml.gz"),
+    ("NL-IPTV", "NL", "https://iptv-epg.org/files/epg-nl.xml.gz"),
+    ("US-IPTV", "US", "https://iptv-epg.org/files/epg-us.xml.gz"),
 ]
-EXTRA_FEED_LABELS = {"DE-FREEEPG", "GR-FREEEPG", "DE-XMLTVLIVE", "GR-XMLTVLIVE"}
+EXTRA_FEED_LABELS = {"DE-FREEEPG", "GR-FREEEPG", "DE-XMLTVLIVE", "GR-XMLTVLIVE",
+                     "FR-IPTV", "IT-IPTV", "PL-IPTV", "HR-IPTV", "NL-IPTV", "US-IPTV"}
+SELECTIVE_COUNTRY_FEEDS = {"FR-IPTV", "IT-IPTV", "PL-IPTV", "HR-IPTV", "NL-IPTV", "US-IPTV"}
 # These are design hints only. Do not infer the actual licence for TV metadata.
 MAX_DOWNLOAD = 180 * 1024 * 1024
 BAD_IDS = {"", "TS", "N/A", "NONE", "NULL", "0", "-"}
-PREFIX = re.compile(r"^(?:DE GO|DE|GR|PRIME|JOYN|WOW|SKYGO)\s*[:\-]\s*", re.I)
+PREFIX = re.compile(r"^(?:DE GO|DE|GR|PRIME|JOYN|WOW|SKYGO|FR|IT|PL|HR|NL|US|UK)\s*[:\-]\s*", re.I)
 QUALITY = re.compile(
     r"\b(?:RAW|HEVC|H265|H264|SD|FHD|HD|UHD|4K|8K|720P|1080P|2160P|"
     r"50FPS|60FPS|30FPS|3840P|EON|WEB|MOBILE|MOBIL|BACKUP|BK|LOW|"
@@ -142,8 +152,10 @@ def clean_name(value: str) -> str:
 
 def market_of(name: str) -> str:
     prefix = name.split(":", 1)[0].strip().upper()
-    if prefix == "GR":
-        return "GR"
+    if prefix == "UK":
+        return "GB"
+    if prefix in {"GR", "DE", "FR", "IT", "PL", "HR", "NL", "US"}:
+        return prefix
     return "DE"
 
 
@@ -298,6 +310,39 @@ def publish_personal_guides(master: Path) -> int:
     return active_count
 
 
+def selected_country_names() -> dict[str, set[str]]:
+    """Target only ordinary playlist channels, never PPV or 24/7 catalogues.
+
+    Particularly for US, downloading the whole EPG is useful for coverage but
+    copying *every* provider programme would make each friend file huge.
+    """
+    inv_path = ROOT / "data" / "inventory.csv"
+    with inv_path.open("r", encoding="utf-8-sig", newline="") as file:
+        inventory = list(csv.DictReader(file))
+    headings: dict[str, str] = {}
+    for row in inventory:
+        title = (row.get("name") or "").strip()
+        category_id = (row.get("category_id") or "").strip()
+        if title.startswith("##") and category_id not in headings:
+            headings[category_id] = title
+    result: defaultdict[str, set[str]] = defaultdict(set)
+    for row in inventory:
+        title = (row.get("name") or "").strip()
+        if not title or title.startswith("##"):
+            continue
+        market = market_of(title)
+        if market not in {"FR", "IT", "PL", "HR", "NL", "US"}:
+            continue
+        category = headings.get((row.get("category_id") or "").strip(), "")
+        if re.search(r"\bPPV\b|(?<!\d)24\s*[/\-]\s*7(?!\d)", title + " " + category, re.I):
+            continue
+        name = clean_name(title)
+        if len(name) >= 3:
+            result[market].add(name)
+    logging.info("Country-specific EPG targets: %s", {k: len(v) for k,v in result.items()})
+    return result
+
+
 def build() -> dict:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     with DATA.open("r", encoding="utf-8-sig", newline="") as csvfile:
@@ -347,10 +392,27 @@ def build() -> dict:
                     raise
                 logging.warning("Skipping unusable optional EPG %s: %s", feed.label, type(error).__name__)
         feeds = working_feeds
+        targets_by_country = selected_country_names()
+        allowed_ids_by_feed: dict[str, set[str]] = {}
+        for feed, channels in zip(feeds, per_feed):
+            if feed.label not in SELECTIVE_COUNTRY_FEEDS:
+                continue
+            requested = targets_by_country.get(feed.market, set())
+            by_name_source: defaultdict[str, set[str]] = defaultdict(set)
+            for channel in channels.values():
+                if not channel.programmes:
+                    continue
+                for clean in channel.norm_names & requested:
+                    by_name_source[clean].add(channel.id)
+            accepted = {next(iter(ids)) for ids in by_name_source.values() if len(ids) == 1}
+            allowed_ids_by_feed[feed.label] = accepted
+            logging.info("%s selected only %s relevant EPG channels", feed.label, len(accepted))
         by_id: dict[str, Channel] = {}
         for feed_channels in per_feed:
             for ch in feed_channels.values():
                 if ch.programmes <= 0:
+                    continue
+                if feeds[ch.feed].label in SELECTIVE_COUNTRY_FEEDS and ch.id not in allowed_ids_by_feed[feeds[ch.feed].label]:
                     continue
                 prev = by_id.get(ch.id.casefold())
                 existing_is_extra = prev is not None and feeds[prev.feed].label in EXTRA_FEED_LABELS
