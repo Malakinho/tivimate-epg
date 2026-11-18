@@ -162,6 +162,60 @@ class RealEpgPriorityTests(unittest.TestCase):
                              ("Eurosport1.de", "programm"))
             self.assertEqual(statuses["DE: EURO SPORT 2 ᴿᴬᵂ"][1], "pruefen")
 
+    def test_owner_confirmed_dazn_bar_guides_map_only_exact_bar_1_and_2(self):
+        dazn1 = self.channel("DAZN1.de", "DAZN 1", 0, 42)
+        dazn2 = self.channel("DAZN2.de", "DAZN 2", 0, 38)
+        with tempfile.TemporaryDirectory() as tmp:
+            inv, output = Path(tmp) / "inventory.csv", Path(tmp) / "dashboard.json"
+            entries = [
+                ("DE: DAZN BAR 1 HEVC", "DAZN.de", "509"),
+                ("DE: DAZN BAR 2 HEVC", "DAZN2.de", "509"),
+                ("DE: DAZN BAR 3 HEVC", "DAZN1.de", "509"),
+                ("DE: DAZN BAR 10 HEVC", "DAZN1.de", "509"),
+            ]
+            with inv.open("w", newline="", encoding="utf-8") as f:
+                writer = csv.DictWriter(
+                    f, fieldnames=["name", "epg_channel_id", "category_id"])
+                writer.writeheader()
+                for name, epg_id, cat_id in entries:
+                    writer.writerow({"name": name, "epg_channel_id": epg_id,
+                                     "category_id": cat_id})
+            report = make_dashboard(
+                inventory_path=inv, output_path=output,
+                ppv_rows=[], always_on_rows=[], named_rows=[],
+                by_id={"dazn1.de": dazn1, "dazn2.de": dazn2},
+                by_name={"DAZN1": [dazn1], "DAZN2": [dazn2]},
+                by_compact={}, aliases={}, feeds=self.feeds,
+                clean_name=clean_name, market_of=market_of,
+                best=lambda *args: None, id_valid=id_valid, live_ppv=False,
+            )
+            rows = {r[0]: r for r in report["rows"]}
+            self.assertEqual(rows["DE: DAZN BAR 1 HEVC"][3:6],
+                             ["DAZN.de", "DAZN1.de", "programm"])
+            self.assertEqual(rows["DE: DAZN BAR 2 HEVC"][3:6],
+                             ["DAZN2.de", "DAZN2.de", "programm"])
+            for name in ("DE: DAZN BAR 3 HEVC", "DE: DAZN BAR 10 HEVC"):
+                self.assertEqual(rows[name][5], "pruefen")
+
+    def test_confirmed_bar_stays_unverified_without_real_guide_programmes(self):
+        empty = self.channel("DAZN1.de", "DAZN 1", 0, 0)
+        with tempfile.TemporaryDirectory() as tmp:
+            inv, output = Path(tmp) / "inventory.csv", Path(tmp) / "dashboard.json"
+            with inv.open("w", newline="", encoding="utf-8") as f:
+                writer = csv.DictWriter(f, fieldnames=["name","epg_channel_id","category_id"])
+                writer.writeheader()
+                writer.writerow({"name":"DE: DAZN BAR 1 HEVC",
+                                 "epg_channel_id":"DAZN.de","category_id":"509"})
+            report = make_dashboard(
+                inventory_path=inv, output_path=output,
+                ppv_rows=[], always_on_rows=[], named_rows=[],
+                by_id={"dazn1.de":empty}, by_name={"DAZN1":[empty]},
+                by_compact={}, aliases={}, feeds=self.feeds,
+                clean_name=clean_name, market_of=market_of,
+                best=lambda *args: None, id_valid=id_valid, live_ppv=False,
+            )
+            self.assertNotEqual(report["rows"][0][5], "programm")
+
     def test_provider_xmltv_copies_only_real_titles_to_stable_alias(self):
         doc = (
             '<tv><channel id="Provider.gr"><display-name>Provider</display-name></channel>'

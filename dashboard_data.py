@@ -52,6 +52,12 @@ def make_dashboard(*, inventory_path: Path, output_path: Path, ppv_rows,
     alias_keys = {a.casefold(): a for a in aliases}
     # Whitelist is limited to checked discrepancies in the
     # provider-ID-present / XMLTV-ID-empty cohort. Other channels are untouched.
+    # The playlist owner confirmed that DAZN BAR 1 and 2 carry the same
+    # programme schedule as the respective standard DAZN 1 and 2 streams.
+    # BAR 1's provider ID is DAZN.de, not DAZN1.de; never rewrite provider
+    # IDs or hijack the separately published DAZN.de XMLTV channel.
+    confirmed_bar_guides = {"DAZN BAR 1": "dazn1.de",
+                            "DAZN BAR 2": "dazn2.de"}
     verified_alias_patterns = {
         "skycinemapremieren.de": (r"\bSKY CINEMA PREMIEREN\b", "SKY CINEMA PREMIERE"),
         "ard.de": (r"\bDAS ERSTE\b", "DAS ERSTE"),
@@ -124,6 +130,16 @@ def make_dashboard(*, inventory_path: Path, output_path: Path, ppv_rows,
             continue
 
         norm = clean_name(name)
+        # A confirmed, exactly numbered TV variant can use the ordinary
+        # station's schedule. Keep the real provider ID visible separately;
+        # a differing provider ID can still require manual TiviMate mapping.
+        confirmed_id = confirmed_bar_guides.get(norm) if market == "DE" else None
+        confirmed = by_id.get(confirmed_id) if confirmed_id else None
+        if (confirmed is not None and confirmed.programmes > 0
+                and feeds[confirmed.feed].market == "DE"):
+            add(name, cat, category_id, provider_id, confirmed.id,
+                "programm", market, kind)
+            continue
         # A prior decision confirmed by the GitHub repository owner is applied
         # only when the same channel/category/provider ID still exists and
         # that ID currently has real programme data.
