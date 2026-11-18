@@ -335,7 +335,9 @@
       return;
     }
     const on=people.filter(f=>f.active).length;
-    setText("friendMessage",on+" aktive EPG-Links · "+people.length+" Einträge insgesamt.");
+    const pending=people.filter(f=>f.pending).length;
+    setText("friendMessage",on+" aktive EPG-Links · "+people.length+" Einträge insgesamt."+
+      (pending?" "+pending+" Änderung(en) warten auf Veröffentlichung – nach Abschluss erneut aktualisieren.":""));
     for(const f of people) {
       const card=document.createElement("article");
       card.className="friend-card";
@@ -343,14 +345,15 @@
       const name=document.createElement("span");name.className="friend-name";name.textContent=f.label;
       const status=document.createElement("span");
       status.className="friend-status"+(f.active?"":" blocked");
-      status.textContent=f.active?"● Aktiv":"● Gesperrt";
+      status.textContent=f.pending?"◷ Veröffentlichung läuft":(f.active?"● Aktiv":"● Gesperrt");
+      if(f.pending)status.style.color="var(--yellow)";
       head.append(name,status);
       const link=document.createElement("div");link.className="friend-link";
-      link.title=f.active?"Über Kopieren in die Zwischenablage übernehmen":"Gesperrt – kein aktiver EPG-Link";
-      link.textContent=f.active?"Persönlicher Link – zum Kopieren klicken":"Link gesperrt";
+      link.title=f.pending?"Der neue Link ist noch nicht veröffentlicht":(f.active?"Über Kopieren in die Zwischenablage übernehmen":"Gesperrt – kein aktiver EPG-Link");
+      link.textContent=f.pending?"GitHub Actions erstellt gerade die persönliche EPG-Datei":(f.active?"Persönlicher Link – zum Kopieren klicken":"Link gesperrt");
       const controls=document.createElement("div");controls.className="friend-buttons";
       if(f.active){
-        controls.append(friendButton("⧉ Kopieren",()=>copyFriendLink(f.path)));
+        controls.append(friendButton("⧉ Kopieren",()=>copyFriendLink(f.path),f.pending));
         controls.append(friendButton("↻ Erneuern",()=>{
           if(window.confirm("Link von „"+f.label+"“ wirklich erneuern? Der alte Link funktioniert danach nicht mehr."))friendIssue("rotate",f);
         }));
@@ -364,16 +367,44 @@
       card.append(head,link,controls);grid.appendChild(card);
     }
   }
-  function loadFriends(){
+  async function loadFriends(){
     const button=$("friendReload");
     button.disabled=true;
-    setText("friendMessage","Lade aktuelle Freundeliste von GitHub Pages …");
-    fetch("friends.json?v="+Date.now(),{cache:"no-store"}).then(r=>{
-      if(!r.ok)throw Error("HTTP "+r.status);
-      return r.json();
-    }).then(displayFriends).catch(()=>{
-      setText("friendMessage","Freundeliste konnte nicht geladen werden. Bitte GitHub-Veröffentlichung prüfen und danach erneut versuchen.");
-    }).finally(()=>{button.disabled=false});
+    setText("friendMessage","Lade Freundeliste und prüfe den Veröffentlichungsstand …");
+    try {
+      const published=await fetch("friends.json?v="+Date.now(),{cache:"no-store"}).then(r=>{
+        if(!r.ok)throw Error("Öffentliche Freundeliste nicht verfügbar");
+        return r.json();
+      });
+      let latest=null;
+      try {
+        // Public repository metadata: not a private authentication endpoint.
+        // GitHub Pages can lag while the EPG generator rebuilds its files.
+        const response=await fetch(
+          "https://api.github.com/repos/Malakinho/tivimate-epg/contents/data/friends.json?ref=main&v="+Date.now(),
+          {cache:"no-store",headers:{"Accept":"application/vnd.github+json"}}
+        );
+        if(response.ok){
+          const contents=await response.json();
+          const binary=atob(String(contents.content||"").replace(/\s+/g,""));
+          const bytes=Uint8Array.from(binary,ch=>ch.charCodeAt(0));
+          latest=JSON.parse(new TextDecoder().decode(bytes));
+        }
+      }catch(e){/* Keep the published registry when GitHub API is unavailable. */}
+      if(latest&&Array.isArray(latest.friends)){
+        const publishedById=new Map((published.friends||[]).map(f=>[f.id,f]));
+        const friends=latest.friends.map(f=>{
+          const active=Boolean(f.active);
+          const path=active?"epg/"+f.token+"/epg.xml.gz":"";
+          const live=publishedById.get(f.id);
+          return {id:f.id,label:f.label,active,path,
+            pending:!live||live.active!==active||String(live.path||"")!==path};
+        });
+        displayFriends({friends});
+      }else displayFriends(published);
+    }catch(e){
+      setText("friendMessage","Freundeliste konnte nicht geladen werden. GitHub Actions prüfen und danach erneut versuchen.");
+    }finally{button.disabled=false;}
   }
   function populateCategories(){
     const counts=new Map();
