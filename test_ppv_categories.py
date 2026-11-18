@@ -56,6 +56,14 @@ class TestPPVCategories(unittest.TestCase):
         rows = xtream_ppv.current_ppv_rows(ACCESS, {"911", "2014", "1394", "433"})
         self.assertEqual(len(rows), 4)
 
+    def test_compact_and_stylized_ppv_names(self):
+        from dashboard_data import PPV as DASHBOARD_PPV
+        for title in ("RO: PRIMA SPORT PPV1", "RO: PRIMA SPORT PPV2",
+                      "RO: PRIMA SPORT PPV3", "GR: ERT SPORTS 4 ᴾᴾⱽ"):
+            self.assertTrue(xtream_ppv.PPV_LABEL.search(title), title)
+            self.assertTrue(DASHBOARD_PPV.search(title), title)
+        self.assertIsNone(xtream_ppv.PPV_LABEL.search("US: BET"))
+
     @patch("xtream_ppv.urlopen", side_effect=mock_fetch)
     def test_relabel_keeps_same_epg_id(self, unused):
         initial = xtream_ppv.current_ppv_rows(ACCESS, {"911"})
