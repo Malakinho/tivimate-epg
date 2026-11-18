@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 HEADER = re.compile(r"^#{2,}")
-PPV = re.compile(r"\bPPV\b", re.I)
+PPV = re.compile(r"(?:\bPPV\b|\bPPV(?=\d)|ᴾᴾⱽ)", re.I)
 ALWAYS_ON = re.compile(r"(?<!\d)24\s*[/\-]\s*7(?!\d)", re.I)
 
 
