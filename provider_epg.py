@@ -106,12 +106,14 @@ def provider_coverage(path: Path, wanted: set[str]) -> tuple[dict[str, str], Cou
     return canonical, counts
 
 
-def emit_provider_programmes(path: Path, zipout, matched: dict[str, str]) -> int:
+def emit_provider_programmes(path: Path, zipout, matched: dict[str, str],
+                             aliases_by_source=None) -> int:
     """Only write selected schedules and safe metadata (no authenticated URLs).
 
     matched maps source ID casefold to public playlist EPG ID.
     """
     n = 0
+    aliases_by_source = aliases_by_source or {}
     with open_provider(path) as raw:
         parser = ET.iterparse(raw, events=("start", "end"))
         root = None
@@ -139,8 +141,10 @@ def emit_provider_programmes(path: Path, zipout, matched: dict[str, str]) -> int
                                             del descendant.attrib[key]
                                 out.append(clean)
                         if out.find("title") is not None:
-                            zipout.write(ET.tostring(out, encoding="utf-8") + b"\n")
-                            n += 1
+                            for destination in (target, *sorted(aliases_by_source.get(source_id, ()))):
+                                out.set("channel", destination)
+                                zipout.write(ET.tostring(out, encoding="utf-8") + b"\n")
+                                n += 1
                 if root is not None:
                     root.clear()
             elif event == "end" and elem.tag == "channel" and root is not None:

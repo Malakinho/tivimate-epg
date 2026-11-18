@@ -112,8 +112,7 @@ def current_ppv_rows(secret_url: str, known_ppv_category_ids=None, named_categor
         is_named = (named_category_ids is not None
                     and (category_id in named_ids or category_is_named(category_name)))
         saved = previous_bindings.get(opaque_id, {})
-        no_provider_epg = str(channel.get("epg_channel_id") or "").strip().upper() in BAD_EPG_IDS
-        is_always = (always_category_ids is not None and no_provider_epg
+        is_always = (always_category_ids is not None
                      and (category_id in always_ids
                           or ALWAYS_LABEL.search(category_name)
                           or ALWAYS_LABEL.search(title)
@@ -121,12 +120,14 @@ def current_ppv_rows(secret_url: str, known_ppv_category_ids=None, named_categor
                           or saved.get("kind") == "always"))
         if not (is_ppv or is_named or is_always):
             continue
+        provider_id = str(channel.get("epg_channel_id") or "").strip()
         is_us = (bool(re.search(r"^(?:US\s*[:(]|\(US\))", title, re.I))
                  or bool(re.search(r"\b(?:US|USA)\b", category_name, re.I)))
         if is_ppv and stream_id not in seen:
             seen.add(stream_id)
             result.append({
                 "id": "ppv.live." + opaque_id, "name": title,
+                "category_id": category_id, "epg_channel_id": provider_id,
                 "category": category_name or "PPV",
                 "region": "US" if is_us else "DE/International",
             })
@@ -134,7 +135,8 @@ def current_ppv_rows(secret_url: str, known_ppv_category_ids=None, named_categor
             named_seen.add(stream_id)
             named_rows.append({
                 "id": stable_id("named", opaque_id, category_id, title), "name": title,
-                "category_id": category_id, "category": category_name or "Sendername",
+                "category_id": category_id, "epg_channel_id": provider_id,
+                "category": category_name or "Sendername",
                 "region": "US" if is_us else "DE/International", "source": "live",
                 "fingerprint": opaque_id,
             })
@@ -142,7 +144,8 @@ def current_ppv_rows(secret_url: str, known_ppv_category_ids=None, named_categor
             always_seen.add(stream_id)
             always_rows.append({
                 "id": stable_id("always", opaque_id, category_id, title), "name": title,
-                "category_id": category_id, "category": category_name or "24/7",
+                "category_id": category_id, "epg_channel_id": provider_id,
+                "category": category_name or "24/7",
                 "region": "US" if is_us else "DE/International", "source": "live",
                 "fingerprint": opaque_id,
             })

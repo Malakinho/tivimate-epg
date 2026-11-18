@@ -87,7 +87,7 @@ class PlaceholderRenameTest(unittest.TestCase):
                 self.assertNotIn("password", raw)
                 self.assertNotIn("DATELINE CLASSICS", raw)
 
-    def test_avoid_leaking_real_tv_epg_channels_to_placeholders(self):
+    def test_real_provider_ids_are_kept_for_later_real_programme_resolution(self):
         streams = [
             {"stream_id": 1, "category_id": "1470", "name": "GR: FILM REAL EPG", "epg_channel_id": "film.gr"},
             {"stream_id": 2, "category_id": "1470", "name": "GR: FILM PLACEHOLDER", "epg_channel_id": "TS"},
@@ -107,7 +107,9 @@ class PlaceholderRenameTest(unittest.TestCase):
             ppv, named, always = current_ppv_rows(ACCESS, {"33"}, set(), {"1470"})
         self.assertEqual(len(ppv), 1)
         self.assertFalse(named)
-        self.assertEqual([r["name"] for r in always], ["GR: FILM PLACEHOLDER"])
+        self.assertEqual([r["name"] for r in always],
+                         ["GR: FILM REAL EPG", "GR: FILM PLACEHOLDER"])
+        self.assertEqual(always[0]["epg_channel_id"], "film.gr")
 
     def test_dashboard_keeps_static_placeholders_for_unavailable_categories(self):
         from types import SimpleNamespace

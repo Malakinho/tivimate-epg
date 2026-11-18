@@ -23,7 +23,7 @@ def make_dashboard(*, inventory_path: Path, output_path: Path, ppv_rows,
                    clean_name, market_of, best, id_valid, live_ppv: bool,
                    provider_fallback_ids=None, manual_approvals=None,
                    live_all_placeholders=False, named_category_ids=None,
-                   static_always_names=None):
+                   static_always_names=None, real_placeholder_ids=None):
     """Data is informational; a source match does not guarantee player assignment."""
     with inventory_path.open(encoding="utf-8-sig", newline="") as handle:
         inventory = list(csv.DictReader(handle))
@@ -46,6 +46,9 @@ def make_dashboard(*, inventory_path: Path, output_path: Path, ppv_rows,
     live_always_ids = {str(r.get("category_id") or "").strip()
                        for r in always_on_rows if r.get("source") == "live"}
     static_always_names = static_always_names or set()
+    real_placeholder_ids = real_placeholder_ids or set()
+    def placeholder_status(xmltv_id):
+        return "programm" if xmltv_id in real_placeholder_ids else "platzhalter"
     alias_keys = {a.casefold(): a for a in aliases}
     # Whitelist is limited to checked discrepancies in the
     # provider-ID-present / XMLTV-ID-empty cohort. Other channels are untouched.
@@ -100,16 +103,19 @@ def make_dashboard(*, inventory_path: Path, output_path: Path, ppv_rows,
             market = "GR"
         kind = "PPV" if is_ppv else "Sendername" if is_named else "24/7" if is_always else "Sender"
         if is_ppv and name in by_ppv_static:
-            add(name, cat, category_id, provider_id, by_ppv_static[name],
-                "platzhalter", market, kind)
+            cid = by_ppv_static[name]
+            add(name, cat, category_id, provider_id, cid,
+                placeholder_status(cid), market, kind)
             continue
         if is_always and name in by_always:
-            add(name, cat, category_id, provider_id, by_always[name],
-                "platzhalter", market, kind)
+            cid = by_always[name]
+            add(name, cat, category_id, provider_id, cid,
+                placeholder_status(cid), market, kind)
             continue
         if is_named:
-            add(name, cat, category_id, provider_id, by_named_static[(name, category_id)],
-                "platzhalter", market, "Sendername")
+            cid = by_named_static[(name, category_id)]
+            add(name, cat, category_id, provider_id, cid,
+                placeholder_status(cid), market, "Sendername")
             continue
 
         norm = clean_name(name)
@@ -204,7 +210,8 @@ def make_dashboard(*, inventory_path: Path, output_path: Path, ppv_rows,
             epg_id = (ppv.get("id") or "").strip()
             if name and epg_id:
                 add(name, (ppv.get("category") or "PPV – Live vom Anbieter"),
-                    "live-ppv", "", epg_id, "platzhalter",
+                    "live-ppv", ppv.get("epg_channel_id") or "", epg_id,
+                    placeholder_status(epg_id),
                     (ppv.get("region") or "DE/International"), "PPV")
 
     # Append live 24/7 placeholders. Their XMLTV IDs remain stable even
@@ -216,7 +223,8 @@ def make_dashboard(*, inventory_path: Path, output_path: Path, ppv_rows,
         epg_id = (entry.get("id") or "").strip()
         if name and epg_id:
             add(name, entry.get("category") or "24/7",
-                str(entry.get("category_id") or ""), "", epg_id, "platzhalter",
+                str(entry.get("category_id") or ""), entry.get("epg_channel_id") or "",
+                epg_id, placeholder_status(epg_id),
                 entry.get("region") or market_of(name), "24/7")
 
     # Append current named-category streams only: static records are superseded.
@@ -227,7 +235,8 @@ def make_dashboard(*, inventory_path: Path, output_path: Path, ppv_rows,
         epg_id = (entry.get("id") or "").strip()
         if name and epg_id:
             add(name, entry.get("category") or "Sendername",
-                str(entry.get("category_id") or ""), "", epg_id, "platzhalter",
+                str(entry.get("category_id") or ""), entry.get("epg_channel_id") or "",
+                epg_id, placeholder_status(epg_id),
                 entry.get("region") or market_of(name), "Sendername")
 
     report = {

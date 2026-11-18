@@ -30,6 +30,7 @@ from xml.etree import ElementTree as ET
 from xtream_ppv import current_ppv_rows
 from named_categories import named_category_ids, static_named_rows
 from name_matching import compact_index, matching_candidates
+from real_epg_priority import resolve_placeholder_programmes
 from placeholder_history import previous_state, write_bindings
 from dashboard_data import make_dashboard
 from provider_epg import fetch_provider_xmltv, provider_coverage, emit_provider_programmes
@@ -632,6 +633,9 @@ def build() -> dict:
         with (ROOT / "data" / "inventory.csv").open("r", encoding="utf-8-sig", newline="") as inv:
             provider_ids = {row.get("epg_channel_id", "").strip() for row in csv.DictReader(inv)}
         covered_ids = set(by_id) | {aid.casefold() for aid in aliases}
+        # Some live streams have guide IDs missing from old inventory snapshots.
+        provider_ids.update(str(item.get("epg_channel_id") or "").strip()
+                            for item in placeholder_rows)
         wanted_ids = {p.casefold() for p in provider_ids if id_valid(p) and p.casefold() not in covered_ids}
         provider_path = None
         provider_fallback_ids = {}
@@ -652,6 +656,28 @@ def build() -> dict:
                 logging.warning("Provider XMLTV fallback skipped: %s", type(error).__name__)
                 provider_path = None
                 provider_fallback_ids = {}
+
+        # First resolve genuine programme sources for EVERY placeholder
+        # category. Preserve the already published XMLTV ID in all cases.
+        public_real, provider_real = resolve_placeholder_programmes(
+            placeholder_rows, by_id=by_id, by_name=by_name,
+            by_compact=by_compact, feeds=feeds, clean_name=clean_name,
+            id_valid=id_valid, provider_fallback_ids=provider_fallback_ids)
+        real_placeholder_ids = set(public_real) | set(provider_real)
+        # One XMLTV channel/programme set per published placeholder ID.
+        placeholder_rows = list({
+            str(item["id"]): item for item in placeholder_rows
+            if item.get("id") and item.get("name")
+        }.values())
+        targets_for_public = defaultdict(set)
+        targets_for_provider = defaultdict(set)
+        for xmltv_id, source in public_real.items():
+            targets_for_public[(source.feed, source.id)].add(xmltv_id)
+        for xmltv_id, source_id in provider_real.items():
+            targets_for_provider[source_id.casefold()].add(xmltv_id)
+        logging.info("Real guide overrides: %d public, %d provider; %d name-only placeholders",
+                     len(public_real), len(provider_real),
+                     len(placeholder_rows) - len(real_placeholder_ids))
 
         temporary_out = OUT_DIR / "epg.xml.gz.tmp"
         total_programmes = 0
@@ -679,15 +705,21 @@ def build() -> dict:
                     ch = ET.Element("channel", {"id": cid})
                     ET.SubElement(ch, "display-name").text = cid
                     zipout.write(ET.tostring(ch, encoding="utf-8") + b"\n")
-                # PPV placeholder channels: full provider name as EPG title.
-                # Never imply that these are real broadcast event times.
+                # Retain the original XMLTV ID for manual TiviMate mapping.
+                # Add real source display names if real programmes are served.
                 for item in placeholder_rows:
                     cid = item["id"]
                     title = item["name"]
-                    if not cid or not title:
-                        continue
                     channel = ET.Element("channel", {"id": cid})
                     ET.SubElement(channel, "display-name").text = title
+                    real_source = public_real.get(cid)
+                    if real_source:
+                        for source_name in real_source.names[:2]:
+                            if source_name and source_name != title:
+                                ET.SubElement(channel, "display-name").text = source_name
+                        icon = real_source.element.find("icon")
+                        if icon is not None:
+                            channel.append(copy.deepcopy(icon))
                     zipout.write(ET.tostring(channel, encoding="utf-8") + b"\n")
                 for index, feed in enumerate(feeds):
                     targets = chosen_from_feed[index]
@@ -705,7 +737,9 @@ def build() -> dict:
                                     zipout.write(ET.tostring(elem, encoding="utf-8"))
                                     zipout.write(b"\n")
                                     total_programmes += 1
-                                    for alias in target_aliases.get((index, original), []):
+                                    all_aliases = set(target_aliases.get((index, original), []))
+                                    all_aliases.update(targets_for_public.get((index, original), ()))
+                                    for alias in sorted(all_aliases):
                                         elem.set("channel", alias)
                                         zipout.write(ET.tostring(elem, encoding="utf-8"))
                                         zipout.write(b"\n")
@@ -716,13 +750,15 @@ def build() -> dict:
                             elif event == "end" and elem.tag == "channel" and root is not None:
                                 root.clear()
                 if provider_path and provider_fallback_ids:
-                    total_programmes += emit_provider_programmes(provider_path, zipout, provider_fallback_ids)
+                    total_programmes += emit_provider_programmes(
+                        provider_path, zipout, provider_fallback_ids,
+                        aliases_by_source=targets_for_provider)
                 from datetime import timedelta
                 today = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
                 for item in placeholder_rows:
                     cid = item["id"]
                     title = item["name"]
-                    if not cid or not title:
+                    if cid in real_placeholder_ids:
                         continue
                     for offset in range(-1, 8):
                         start = today + timedelta(days=offset)
@@ -762,6 +798,10 @@ def build() -> dict:
             "always_on_placeholder_channels": len(always_on_rows),
             "named_category_placeholder_channels": len(named_rows),
             "named_category_live_channels": len(live_named_rows),
+            "real_programme_placeholder_channels": len(real_placeholder_ids),
+            "real_programme_placeholder_public": len(public_real),
+            "real_programme_placeholder_provider": len(provider_real),
+            "remaining_name_only_placeholder_channels": len(placeholder_rows) - len(real_placeholder_ids),
             "match_statistics": dict(metrics),
             "limitations": "Missing or conflicting tvg-id in the provider playlist can require manual TiviMate assignment. Programmes depend on the upstream providers.",
         }
@@ -780,6 +820,7 @@ def build() -> dict:
             live_all_placeholders=bool(xtream_url), named_category_ids=named_ids,
             static_always_names={r["name"] for r in always_on_static if r.get("name")},
             provider_fallback_ids=provider_fallback_ids,
+            real_placeholder_ids=real_placeholder_ids,
             manual_approvals=manual_approvals,
         )
         result["dashboard_channels"] = dashboard["total"]
