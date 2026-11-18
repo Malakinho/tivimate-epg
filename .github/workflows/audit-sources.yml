@@ -1,0 +1,91 @@
+name: EPG-Quellen-Abdeckung prüfen (nur Analyse)
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/audit-sources.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Neue XMLTV-Quellen mit Sendern ohne EPG abgleichen
+        shell: bash
+        run: |
+          python - <<'PY'
+          import gzip, io, json, re
+          from collections import Counter, defaultdict
+          from urllib.request import urlopen, Request
+          from xml.etree import ElementTree as ET
+          from build import clean_name
+
+          FEEDS = [
+              ('GB-IPTV', 'GB', 'https://iptv-epg.org/files/epg-gb.xml'),
+              ('FR-IPTV', 'FR', 'https://iptv-epg.org/files/epg-fr.xml'),
+              ('IT-IPTV', 'IT', 'https://iptv-epg.org/files/epg-it.xml'),
+              ('PL-IPTV', 'PL', 'https://iptv-epg.org/files/epg-pl.xml'),
+              ('TR-IPTV', 'TR', 'https://iptv-epg.org/files/epg-tr.xml'),
+              ('GB-FREEEPG', 'GB', 'https://free-epg.de/api/epg/gb.xml.gz'),
+              ('US-FREEEPG', 'US', 'https://free-epg.de/api/epg/us.xml.gz'),
+              ('GR-OPENEPG', 'GR', 'https://www.open-epg.com/files/greece.xml.gz'),
+              ('DE-OPENEPG', 'DE', 'https://www.open-epg.com/files/germany.xml.gz'),
+              ('GB-EPGPW', 'GB', 'https://epg.pw/xmltv/epg_GB.xml.gz'),
+          ]
+          PREFIX=re.compile(r'^(?:UK|US|GB|FR|IT|PL|TR|ES|NL|RO|HR|GR|DE|BG|SR|SI|PT|CY|CH|AT|NZ|AF|SG)\s*[:\-]\s*',re.I)
+          RG={'UK':'GB','GB':'GB','US':'US','FR':'FR','IT':'IT','PL':'PL','TR':'TR','GR':'GR','DE':'DE'}
+          def get(url,limit=75*1024*1024):
+              with urlopen(Request(url,headers={'User-Agent':'EPG-coverage-audit/1.0'}),timeout=40) as r:
+                  b=r.read(limit+1)
+              if len(b)>limit:raise ValueError('data size cap exceeded')
+              return b
+          def norm(name):return clean_name(PREFIX.sub('',str(name or '')))
+          obj=json.loads(get('https://malakinho.github.io/tivimate-epg/dashboard.json',10*1024*1024))
+          missing=[]
+          for row in obj['rows']:
+              name,cat,catid,provider,xmlid,status,reg,kind=row[:8]
+              if kind!='Sender' or status not in ('ohne','pruefen'):continue
+              m=PREFIX.match(name)
+              prefix=m.group().split(':')[0].strip(' -:').upper() if m else ''
+              missing.append((name, norm(name), RG.get(prefix)))
+          print('Regular channels lacking programmes:',len(missing),flush=True)
+          for label,region,url in FEEDS:
+              try:
+                  b=get(url)
+                  file=gzip.GzipFile(fileobj=io.BytesIO(b)) if b[:2]==b'\x1f\x8b' else io.BytesIO(b)
+                  channels={};count=Counter(); root=None
+                  with file:
+                      for event,e in ET.iterparse(file,events=('start','end')):
+                          if event=='start' and root is None:root=e
+                          elif event=='end':
+                              if e.tag=='channel':
+                                  names={norm(n.text) for n in e.findall('display-name') if n.text}
+                                  if e.get('id') and names:channels[e.get('id')]=names
+                              elif e.tag=='programme' and e.get('channel'):
+                                  count[e.get('channel')]+=1
+                              if e.tag in ('channel','programme') and root is not None:root.clear()
+                  idx=defaultdict(set)
+                  for cid,names in channels.items():
+                      if count[cid]:
+                          for name in names:idx[name].add(cid)
+                  matches=[]
+                  for name,key,prefix in missing:
+                      if prefix!=region:continue
+                      ids=idx.get(key,set())
+                      if len(ids)==1:matches.append((name,next(iter(ids))))
+                  print(label,'channels=',sum(bool(count[c]) for c in channels),
+                        'programme_entries=',sum(count.values()),
+                        'new_match_candidates=',len(matches),
+                        'examples=',matches[:12],flush=True)
+              except Exception as err:
+                  print(label,'SKIPPED',type(err).__name__,str(err)[:90],flush=True)
+          print('Audit only: NO source data redistributed and NO website changed.',flush=True)
+          PY
