@@ -815,6 +815,10 @@ def build() -> dict:
             "always_on_placeholder_channels": len(always_on_rows),
             "named_category_placeholder_channels": len(named_rows),
             "named_category_live_channels": len(live_named_rows),
+            "always_on_static_fallback_channels": sum(
+                row.get("source") != "live" for row in always_on_rows),
+            "named_category_static_fallback_channels": sum(
+                row.get("source") != "live" for row in named_rows),
             "real_programme_placeholder_channels": len(real_placeholder_ids),
             "real_programme_placeholder_public": len(public_real),
             "real_programme_placeholder_provider": len(provider_real),
