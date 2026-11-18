@@ -31,6 +31,7 @@ from xtream_ppv import current_ppv_rows
 from named_categories import named_category_ids, static_named_rows
 from name_matching import compact_index, matching_candidates
 from real_epg_priority import resolve_placeholder_programmes
+from diagnostics import begin_source_report, mark_source, public_source_report
 from placeholder_history import previous_state, write_bindings
 from dashboard_data import make_dashboard
 from provider_epg import fetch_provider_xmltv, provider_coverage, emit_provider_programmes
@@ -467,6 +468,7 @@ def build() -> dict:
     with tempfile.TemporaryDirectory() as temp:
         temp_dir = Path(temp)
         feeds: list[Feed] = []
+        source_report = begin_source_report(SOURCES)
         for name, market, url in SOURCES:
             file_name = f"{name}.xml.gz" if url.endswith(".gz") else f"{name}.xml"
             destination = temp_dir / file_name
@@ -474,7 +476,8 @@ def build() -> dict:
                 download(url, destination)
                 feeds.append(Feed(name, market, url, destination))
             except Exception as error:
-                logging.warning("Skipping source %s: %s", name, error)
+                mark_source(source_report, name, "failed", "download")
+                logging.warning("Skipping source %s: %s", name, type(error).__name__)
         if not feeds:
             raise RuntimeError("No live EPG source could be downloaded. No output overwritten.")
 
@@ -483,12 +486,20 @@ def build() -> dict:
         for feed in feeds:
             try:
                 channels = inspect_feed(feed, len(working_feeds))
-                if feed.label in EXTRA_FEED_LABELS and not any(c.programmes for c in channels.values()):
+                programme_count = sum(ch.programmes for ch in channels.values())
+                if not programme_count and feed.label in EXTRA_FEED_LABELS:
+                    mark_source(source_report, feed.label, "empty", "no_programmes",
+                                len(channels), 0)
                     logging.warning("Skipping source without programmes: %s", feed.label)
                     continue
+                mark_source(source_report, feed.label,
+                            "ok" if programme_count else "empty",
+                            "" if programme_count else "no_programmes",
+                            len(channels), programme_count)
                 per_feed.append(channels)
                 working_feeds.append(feed)
             except Exception as error:
+                mark_source(source_report, feed.label, "failed", "invalid_feed")
                 if feed.label not in EXTRA_FEED_LABELS:
                     raise
                 logging.warning("Skipping unusable optional EPG %s: %s", feed.label, type(error).__name__)
@@ -784,6 +795,12 @@ def build() -> dict:
         result = {
             "updated_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
             "feeds_ok": [feed.label for feed in feeds],
+            "source_health": public_source_report(source_report),
+            "source_health_summary": {
+                "ok": sum(x["status"] == "ok" for x in source_report.values()),
+                "failed": sum(x["status"] == "failed" for x in source_report.values()),
+                "empty": sum(x["status"] == "empty" for x in source_report.values()),
+            },
             "extra_only_source_channels": extra_channels,
             "base_channels": len(by_id),
             "active_personal_links": active_friends,
