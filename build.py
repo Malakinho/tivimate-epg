@@ -29,6 +29,7 @@ from xml.etree import ElementTree as ET
 
 from xtream_ppv import current_ppv_rows
 from named_categories import named_category_ids, static_named_rows
+from name_matching import compact_index, matching_candidates
 from dashboard_data import make_dashboard
 from provider_epg import fetch_provider_xmltv, provider_coverage, emit_provider_programmes
 
@@ -490,6 +491,7 @@ def build() -> dict:
         for ch in by_id.values():
             for n in ch.norm_names:
                 by_name[n].append(ch)
+        by_compact = compact_index(by_name)
 
         for feed_channels in per_feed:
             matches = [(ch.id, ch.names[:2], ch.programmes) for ch in feed_channels.values()
@@ -508,7 +510,11 @@ def build() -> dict:
                 continue
             market = market_of(label)
             direct = by_id.get(user_id.casefold()) if id_valid(user_id) else None
-            named = best(by_name.get(normalized, []), market, feeds, user_id)
+            exact_candidates = by_name.get(normalized, [])
+            compact_candidates = matching_candidates(normalized, by_name, by_compact)
+            named = best(compact_candidates, market, feeds, user_id)
+            if named and not exact_candidates:
+                metrics["unambiguous_spacing_match"] += 1
             if not named and market == "GR" and normalized.startswith("MAGENTA SPORT"):
                 # Greek COSMOTE Sport was rebranded as Magenta Sport.
                 old_brand = normalized.replace("MAGENTA SPORT", "COSMOTE SPORT", 1)
@@ -727,7 +733,8 @@ def build() -> dict:
             ppv_rows=ppv_rows,
             always_on_rows=always_on_rows,
             named_rows=named_rows,
-            by_id=by_id, by_name=by_name, aliases=aliases, feeds=feeds,
+            by_id=by_id, by_name=by_name, by_compact=by_compact,
+            aliases=aliases, feeds=feeds,
             clean_name=clean_name, market_of=market_of, best=best, id_valid=id_valid,
             live_ppv=bool(xtream_url),
             provider_fallback_ids=provider_fallback_ids,

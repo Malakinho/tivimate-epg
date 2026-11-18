@@ -10,6 +10,8 @@ from collections import Counter, defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 
+from name_matching import matching_candidates
+
 HEADER = re.compile(r"^#{2,}")
 PPV = re.compile(r"(?:\bPPV\b|\bPPV(?=\d)|ᴾᴾⱽ)", re.I)
 ALWAYS_ON = re.compile(r"(?<!\d)24\s*[/\-]\s*7(?!\d)", re.I)
@@ -17,6 +19,7 @@ ALWAYS_ON = re.compile(r"(?<!\d)24\s*[/\-]\s*7(?!\d)", re.I)
 
 def make_dashboard(*, inventory_path: Path, output_path: Path, ppv_rows,
                    always_on_rows, named_rows, by_id, by_name, aliases, feeds,
+                   by_compact=None,
                    clean_name, market_of, best, id_valid, live_ppv: bool,
                    provider_fallback_ids=None, manual_approvals=None):
     """Data is informational; a source match does not guarantee player assignment."""
@@ -125,7 +128,8 @@ def make_dashboard(*, inventory_path: Path, output_path: Path, ppv_rows,
                     uncertain_id = provider_id
 
         if actual is None and norm:
-            named = best(by_name.get(norm, []), market, feeds, provider_id)
+            named = best(matching_candidates(norm, by_name, by_compact or {}),
+                         market, feeds, provider_id)
             if named:
                 actual = named
                 own_alias = "personal." + hashlib.sha256(name.encode("utf-8")).hexdigest()[:16]
