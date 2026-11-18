@@ -27,7 +27,7 @@ def compact_index(by_name: dict):
         if not normalized:
             continue
         key = compact_key(normalized)
-        if len(key[0]) < 5:
+        if len(key[0]) < 3:
             continue
         keys[key][normalized] = channels
     return {key: next(iter(variants.values()))
@@ -40,6 +40,6 @@ def matching_candidates(normalized: str, by_name: dict, by_compact: dict):
     if exact:
         return exact
     key = compact_key(normalized)
-    if len(key[0]) < 5:
+    if len(key[0]) < 3:
         return ()
     return by_compact.get(key, ())
