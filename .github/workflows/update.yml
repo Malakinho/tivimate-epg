@@ -55,6 +55,10 @@ jobs:
         uses: actions/upload-pages-artifact@v3
         with:
           path: ./site
+      # GitHub Actions artefact lookup can lag a few seconds after upload.
+      # Give the Pages API time to index the new single-run artefact.
+      - name: Auf Verfügbarkeit des Pages-Artefakts warten
+        run: sleep 30
       - name: Live schalten
         id: deployment
         uses: actions/deploy-pages@v4
