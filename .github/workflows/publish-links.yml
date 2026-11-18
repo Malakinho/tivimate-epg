@@ -1,0 +1,44 @@
+name: Persönliche EPG-Links ohne Neubau veröffentlichen
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'publish_links.py'
+      - 'data/friends.json'
+      - '.github/workflows/publish-links.yml'
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  # Prioritize fast friend-link changes over a stalled full EPG rebuild.
+  cancel-in-progress: true
+
+jobs:
+  publish-friend-links:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Dateien laden
+        uses: actions/checkout@v4
+      - name: Python einrichten
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Bestehende EPG für persönliche Links übernehmen
+        run: python publish_links.py
+      - name: GitHub Pages konfigurieren
+        uses: actions/configure-pages@v5
+      - name: Webseite bereitstellen
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./site
+      - name: Live schalten
+        id: deployment
+        uses: actions/deploy-pages@v4
