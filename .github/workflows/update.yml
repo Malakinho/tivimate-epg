@@ -12,6 +12,8 @@ on:
       - 'dashboard_data.py'
       - 'dashboard/**'
       - 'data/**'
+      # Friend-only changes use the fast Pages publisher, not this generator.
+      - '!data/friends.json'
       - '.github/workflows/update.yml'
 
 permissions:
