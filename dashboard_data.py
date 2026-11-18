@@ -62,10 +62,11 @@ def make_dashboard(*, inventory_path: Path, output_path: Path, ppv_rows,
         category_id = (rec.get("category_id") or "").strip()
         if not name or HEADER.match(name):
             continue
-        if live_ppv and PPV.search(name):
-            # The current provider's PPV names supersede the old exported inventory.
-            continue
         cat = headings.get(category_id, "Kategorie " + category_id)
+        if live_ppv and (PPV.search(name) or PPV.search(cat)):
+            # The live Xtream API supersedes all static PPV-category records,
+            # including US event channels without PPV in their visible names.
+            continue
         provider_id = (rec.get("epg_channel_id") or "").strip()
         # Classify by both the sender name and its provider category.
         # Some event/24/7 streams have generic titles without those words.
@@ -174,8 +175,9 @@ def make_dashboard(*, inventory_path: Path, output_path: Path, ppv_rows,
             name = (ppv.get("name") or "").strip()
             epg_id = (ppv.get("id") or "").strip()
             if name and epg_id:
-                add(name, "PPV – Live vom Anbieter", "live-ppv", "", epg_id,
-                    "platzhalter", "DE/International", "PPV")
+                add(name, (ppv.get("category") or "PPV – Live vom Anbieter"),
+                    "live-ppv", "", epg_id, "platzhalter",
+                    (ppv.get("region") or "DE/International"), "PPV")
 
     report = {
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
