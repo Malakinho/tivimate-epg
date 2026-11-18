@@ -113,7 +113,6 @@
       <button class="navitem" data-mode="platzhalter"><span class="symbol">▤</span> Platzhalter <span class="count" id="navPlace">–</span></button>
       <button class="navitem" data-mode="ppv"><span class="symbol">◈</span> PPV-Sender</button>
       <button class="navitem" data-mode="247"><span class="symbol">◷</span> 24/7-Sender</button>
-      <button class="navitem" data-mode="named"><span class="symbol">▧</span> Sendername-EPG</button>
     </nav>
     <div class="side-label" style="margin-top:15px">Verwaltung</div>
     <a class="navitem" href="m3u.html"><span class="symbol">▤</span> Meine M3U mit EPG</a>
@@ -275,7 +274,6 @@
       if(mode==="ohne"&&st!=="ohne"&&st!=="pruefen")return false;
       if(mode==="ppv"&&kind!=="PPV")return false;
       if(mode==="247"&&kind!=="24/7")return false;
-       if(mode==="named"&&kind!=="Sendername")return false;
       if(selectedCategories!==null&&!selectedCategories.has(String(r[field.catId])))return false;
       if(region&&r[field.region]!==region)return false;
       if(status==="provider_no_xml"){
@@ -289,7 +287,7 @@
   }
   function selectMode(newMode){
     mode=newMode;document.querySelectorAll(".navitem[data-mode]").forEach(function(x){x.classList.toggle("active",x.dataset.mode===newMode)});
-    setText("sectionTitle",({all:"Alle Sender",normal:"Normale TV-Sender",programm:"Sender mit EPG",ohne:"Sender ohne EPG",platzhalter:"EPG-Platzhalter",ppv:"PPV-Sender",247:"24/7-Sender",named:"Sendername-EPG"})[newMode]);
+    setText("sectionTitle",({all:"Alle Sender",normal:"Normale TV-Sender",programm:"Sender mit EPG",ohne:"Sender ohne EPG",platzhalter:"EPG-Platzhalter",ppv:"PPV-Sender",247:"24/7-Sender"})[newMode]);
     apply();
   }
   function exportCsv(){
