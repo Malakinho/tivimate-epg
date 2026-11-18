@@ -39,7 +39,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: PPV-Erkennung für USA und Deutschland testen
-        run: python -m unittest -v test_ppv_categories.py
+        run: python -m unittest -v test_ppv_categories.py test_always_on_categories.py
       - name: XMLTV aus DE und GR erzeugen
         env:
           XTREAM_M3U_URL: ${{ secrets.XTREAM_M3U_URL }}
