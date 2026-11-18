@@ -16,7 +16,7 @@ ALWAYS_ON = re.compile(r"(?<!\d)24\s*[/\-]\s*7(?!\d)", re.I)
 
 
 def make_dashboard(*, inventory_path: Path, output_path: Path, ppv_rows,
-                   always_on_rows, by_id, by_name, aliases, feeds,
+                   always_on_rows, named_rows, by_id, by_name, aliases, feeds,
                    clean_name, market_of, best, id_valid, live_ppv: bool,
                    provider_fallback_ids=None, manual_approvals=None):
     """Data is informational; a source match does not guarantee player assignment."""
@@ -34,6 +34,10 @@ def make_dashboard(*, inventory_path: Path, output_path: Path, ppv_rows,
                  for r in always_on_rows}
     by_ppv_static = {(r.get("name") or "").strip(): r.get("id") or ""
                      for r in ppv_rows}
+    by_named_static = {((r.get("name") or "").strip(), str(r.get("category_id") or "").strip()): r.get("id") or ""
+                       for r in named_rows if r.get("source") == "static"}
+    live_named_ids = {str(r.get("category_id") or "").strip()
+                      for r in named_rows if r.get("source") == "live"}
     alias_keys = {a.casefold(): a for a in aliases}
     # Whitelist is limited to checked discrepancies in the
     # provider-ID-present / XMLTV-ID-empty cohort. Other channels are untouched.
@@ -63,6 +67,9 @@ def make_dashboard(*, inventory_path: Path, output_path: Path, ppv_rows,
         if not name or HEADER.match(name):
             continue
         cat = headings.get(category_id, "Kategorie " + category_id)
+        if category_id in live_named_ids:
+            # Live Xtream channel names replace the static category snapshot.
+            continue
         if live_ppv and (PPV.search(name) or PPV.search(cat)):
             # The live Xtream API supersedes all static PPV-category records,
             # including US event channels without PPV in their visible names.
@@ -72,10 +79,11 @@ def make_dashboard(*, inventory_path: Path, output_path: Path, ppv_rows,
         # Some event/24/7 streams have generic titles without those words.
         is_ppv = bool(PPV.search(name) or PPV.search(cat))
         is_always = bool(name in by_always or ALWAYS_ON.search(name) or ALWAYS_ON.search(cat))
+        is_named = (name, category_id) in by_named_static
         market = market_of(name)
         if name.startswith("GR:") or any("\u0370" <= c <= "\u03ff" for c in cat):
             market = "GR"
-        kind = "PPV" if is_ppv else "24/7" if is_always else "Sender"
+        kind = "PPV" if is_ppv else "Sendername" if is_named else "24/7" if is_always else "Sender"
         if is_ppv and name in by_ppv_static:
             add(name, cat, category_id, provider_id, by_ppv_static[name],
                 "platzhalter", market, kind)
@@ -83,6 +91,10 @@ def make_dashboard(*, inventory_path: Path, output_path: Path, ppv_rows,
         if is_always and name in by_always:
             add(name, cat, category_id, provider_id, by_always[name],
                 "platzhalter", market, kind)
+            continue
+        if is_named:
+            add(name, cat, category_id, provider_id, by_named_static[(name, category_id)],
+                "platzhalter", market, "Sendername")
             continue
 
         norm = clean_name(name)
@@ -178,6 +190,17 @@ def make_dashboard(*, inventory_path: Path, output_path: Path, ppv_rows,
                 add(name, (ppv.get("category") or "PPV – Live vom Anbieter"),
                     "live-ppv", "", epg_id, "platzhalter",
                     (ppv.get("region") or "DE/International"), "PPV")
+
+    # Append current live streams only: static entries already appeared above.
+    for entry in named_rows:
+        if entry.get("source") != "live":
+            continue
+        name = (entry.get("name") or "").strip()
+        epg_id = (entry.get("id") or "").strip()
+        if name and epg_id:
+            add(name, entry.get("category") or "Sendername",
+                str(entry.get("category_id") or ""), "", epg_id, "platzhalter",
+                entry.get("region") or market_of(name), "Sendername")
 
     report = {
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),

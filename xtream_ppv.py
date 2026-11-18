@@ -7,12 +7,14 @@ import hashlib
 import json
 import re
 
+from named_categories import category_is_named
+
 PPV_LABEL = re.compile(r"(?:\bPPV\b|\bPPV(?=\d)|ᴾᴾⱽ)", re.I)
 from urllib.parse import parse_qs, urlencode, urlsplit, urlunsplit
 from urllib.request import Request, urlopen
 
 
-def current_ppv_rows(secret_url: str, known_ppv_category_ids=None):
+def current_ppv_rows(secret_url: str, known_ppv_category_ids=None, named_category_ids=None):
     parsed = urlsplit(secret_url.strip())
     query = parse_qs(parsed.query, keep_blank_values=True)
     username = query.get("username", [""])[0]
@@ -66,6 +68,8 @@ def current_ppv_rows(secret_url: str, known_ppv_category_ids=None):
 
     result = []
     seen = set()
+    named_rows, named_seen = [], set()
+    named_ids = {str(x).strip() for x in (named_category_ids or ())}
     for channel in streams:
         if not isinstance(channel, dict):
             continue
@@ -75,24 +79,33 @@ def current_ppv_rows(secret_url: str, known_ppv_category_ids=None):
         category_name = category_names.get(category_id, "")
         if not title or not stream_id:
             continue
-        if not (PPV_LABEL.search(title)
-                or category_id in current_ppv_ids
-                or (category_id in known and category_id not in category_names)):
+        is_ppv = bool(PPV_LABEL.search(title)
+                      or category_id in current_ppv_ids
+                      or (category_id in known and category_id not in category_names))
+        is_named = (named_category_ids is not None
+                    and (category_id in named_ids or category_is_named(category_name)))
+        if not (is_ppv or is_named):
             continue
-        if stream_id in seen:
-            continue
-        seen.add(stream_id)
-        # Stable for this Xtream stream ID, even when its name changes.
-        # Do not publish raw stream IDs or credentials.
+        # Stable for this Xtream stream ID even when the name changes.
+        # Never publish raw stream IDs or credentials.
         opaque_id = hashlib.sha256((parsed.netloc.lower() + ":" + stream_id).encode("utf-8")).hexdigest()[:22]
         is_us = (bool(re.search(r"^(?:US\s*[:(]|\(US\))", title, re.I))
                  or bool(re.search(r"\b(?:US|USA)\b", category_name, re.I)))
-        result.append({
-            "id": "ppv.live." + opaque_id, "name": title,
-            "category": category_name or "PPV",
-            "region": "US" if is_us else "DE/International",
-        })
+        if is_ppv and stream_id not in seen:
+            seen.add(stream_id)
+            result.append({
+                "id": "ppv.live." + opaque_id, "name": title,
+                "category": category_name or "PPV",
+                "region": "US" if is_us else "DE/International",
+            })
+        elif is_named and stream_id not in named_seen:
+            named_seen.add(stream_id)
+            named_rows.append({
+                "id": "named.live." + opaque_id, "name": title,
+                "category_id": category_id, "category": category_name or "Sendername",
+                "region": "US" if is_us else "DE/International", "source": "live",
+            })
 
     if not result:
         raise RuntimeError("Xtream API returned no PPV channels; published EPG remains unchanged.")
-    return result
+    return (result, named_rows) if named_category_ids is not None else result

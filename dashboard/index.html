@@ -113,6 +113,7 @@
       <button class="navitem" data-mode="platzhalter"><span class="symbol">▤</span> Platzhalter <span class="count" id="navPlace">–</span></button>
       <button class="navitem" data-mode="ppv"><span class="symbol">◈</span> PPV-Sender</button>
       <button class="navitem" data-mode="247"><span class="symbol">◷</span> 24/7-Sender</button>
+      <button class="navitem" data-mode="named"><span class="symbol">▧</span> Sendername-EPG</button>
     </nav>
     <div class="side-label" style="margin-top:15px">Verwaltung</div>
     <a class="navitem" href="m3u.html"><span class="symbol">▤</span> Meine M3U mit EPG</a>
@@ -132,7 +133,7 @@
     <div class="stats" aria-label="EPG-Kennzahlen">
       <div class="stat"><div class="stat-label">◫ &nbsp; Sender insgesamt</div><div class="stat-value" id="total">–</div><div class="stat-detail">Senderliste &amp; Live-PPV</div></div>
       <div class="stat teal"><div class="stat-label">◉ &nbsp; Programmdaten</div><div class="stat-value" id="ok">–</div><div class="stat-detail">Treffer in XMLTV</div></div>
-      <div class="stat yellow"><div class="stat-label">▤ &nbsp; Platzhalter</div><div class="stat-value" id="placeholder">–</div><div class="stat-detail">PPV &amp; 24/7 mit Sendername</div></div>
+      <div class="stat yellow"><div class="stat-label">▤ &nbsp; Platzhalter</div><div class="stat-value" id="placeholder">–</div><div class="stat-detail">PPV, 24/7 &amp; Sonderkategorien</div></div>
       <div class="stat red"><div class="stat-label">◌ &nbsp; Ohne EPG</div><div class="stat-value" id="missing">–</div><div class="stat-detail">Noch ohne passenden Treffer</div></div>
     </div>
     <div class="progress" role="img" id="progress" aria-label="EPG-Abdeckung">
@@ -189,7 +190,7 @@
       <div class="footer"><div id="pageSummary">–</div><div class="pages"><button class="btn" id="prev">← Zurück</button><span id="pageLabel">–</span><button class="btn" id="next">Weiter →</button></div></div>
     </section>
     <div class="hint">
-      <strong>Was bedeutet der Status?</strong> „Mit EPG“ bedeutet, dass wir passende Programmdaten in der XMLTV gefunden haben – nicht zwingend, dass TiviMate oder iMPlayer die Zuordnung automatisch vorgenommen hat. „Zuordnung prüfen“ kennzeichnet eine vorhandene EPG-ID, deren Programmsender möglicherweise nicht zum Stream passt. „Platzhalter“ zeigt bei PPV und 24/7 den Sendernamen als Programmtitel. <br>
+      <strong>Was bedeutet der Status?</strong> „Mit EPG“ bedeutet, dass wir passende Programmdaten in der XMLTV gefunden haben – nicht zwingend, dass TiviMate oder iMPlayer die Zuordnung automatisch vorgenommen hat. „Zuordnung prüfen“ kennzeichnet eine vorhandene EPG-ID, deren Programmsender möglicherweise nicht zum Stream passt. „Platzhalter“ zeigt bei PPV, 24/7 und Sonderkategorien den Sendernamen als Programmtitel. <br>
       <span style="display:inline-block;margin-top:5px">Die Webseite selbst speichert keine Zugangsdaten. Du kannst eine vorhandene Anbieter-ID per <strong>„ID übernehmen“</strong> zur Freigabe auf GitHub öffnen. Nur der angemeldete <strong>Repository-Inhaber</strong> kann sie durch „Submit new issue“ dauerhaft bestätigen. Eine Übernahme wird nur angeboten, wenn unsere XMLTV unter dieser ID bereits echte Programme enthält. Die Bestätigung ist als GitHub-Issue öffentlich sichtbar. <a href="https://github.com/Malakinho/tivimate-epg/actions/workflows/update.yml" target="_blank" rel="noopener noreferrer">GitHub-Aktualisierungen ansehen</a>.</span>
     </div>
   </main>
@@ -274,6 +275,7 @@
       if(mode==="ohne"&&st!=="ohne"&&st!=="pruefen")return false;
       if(mode==="ppv"&&kind!=="PPV")return false;
       if(mode==="247"&&kind!=="24/7")return false;
+       if(mode==="named"&&kind!=="Sendername")return false;
       if(selectedCategories!==null&&!selectedCategories.has(String(r[field.catId])))return false;
       if(region&&r[field.region]!==region)return false;
       if(status==="provider_no_xml"){
@@ -287,7 +289,7 @@
   }
   function selectMode(newMode){
     mode=newMode;document.querySelectorAll(".navitem[data-mode]").forEach(function(x){x.classList.toggle("active",x.dataset.mode===newMode)});
-    setText("sectionTitle",({all:"Alle Sender",normal:"Normale TV-Sender",programm:"Sender mit EPG",ohne:"Sender ohne EPG",platzhalter:"EPG-Platzhalter",ppv:"PPV-Sender",247:"24/7-Sender"})[newMode]);
+    setText("sectionTitle",({all:"Alle Sender",normal:"Normale TV-Sender",programm:"Sender mit EPG",ohne:"Sender ohne EPG",platzhalter:"EPG-Platzhalter",ppv:"PPV-Sender",247:"24/7-Sender",named:"Sendername-EPG"})[newMode]);
     apply();
   }
   function exportCsv(){

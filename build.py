@@ -28,6 +28,7 @@ from urllib.request import Request, urlopen
 from xml.etree import ElementTree as ET
 
 from xtream_ppv import current_ppv_rows
+from named_categories import named_category_ids, static_named_rows
 from dashboard_data import make_dashboard
 from provider_epg import fetch_provider_xmltv, provider_coverage, emit_provider_programmes
 
@@ -386,6 +387,9 @@ def build() -> dict:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     with DATA.open("r", encoding="utf-8-sig", newline="") as csvfile:
         input_rows = list(csv.DictReader(csvfile))
+    with (ROOT / "data" / "inventory.csv").open("r", encoding="utf-8-sig", newline="") as csvfile:
+        full_inventory = list(csv.DictReader(csvfile))
+    named_ids = named_category_ids(full_inventory)
     xtream_url = os.environ.get("XTREAM_M3U_URL", "").strip()
     with PPV_DATA.open("r", encoding="utf-8-sig", newline="") as csvfile:
         static_ppv_rows = list(csv.DictReader(csvfile))
@@ -396,21 +400,23 @@ def build() -> dict:
             str(item.get("category_id") or "").strip()
             for item in static_ppv_rows if item.get("category_id")
         }
-        ppv_rows = current_ppv_rows(xtream_url, known_ppv_categories)
+        ppv_rows, live_named_rows = current_ppv_rows(xtream_url, known_ppv_categories, named_ids)
         logging.info("Live PPV names retrieved: %s channels (including PPV categories)", len(ppv_rows))
     else:
+        live_named_rows = []
         ppv_rows = static_ppv_rows
         logging.info("Using static PPV fallback: configure XTREAM_M3U_URL secret for live updates")
     # PPV placeholders remain unchanged. 24/7 entries are only added
     # where the provider supplied no EPG ID.
     with ALWAYS_ON_DATA.open("r", encoding="utf-8-sig", newline="") as csvfile:
         always_on_rows = list(csv.DictReader(csvfile))
-    # The full IPTV inventory contains the 24/7 categories; channels.csv
-    # only covers a smaller selected channel cohort.
-    with (ROOT / "data" / "inventory.csv").open("r", encoding="utf-8-sig", newline="") as csvfile:
-        full_inventory = list(csv.DictReader(csvfile))
+    # Use full inventory for 24/7 and requested movie/sports categories.
     always_on_rows = extend_always_on_categories(always_on_rows, full_inventory)
-    placeholder_rows = ppv_rows + always_on_rows
+    live_category_ids = {r["category_id"] for r in live_named_rows}
+    named_rows = live_named_rows + static_named_rows(full_inventory, named_ids - live_category_ids)
+    logging.info("Sendername-EPG: %d categories, %d live / %d static channels",
+                 len(named_ids), len(live_named_rows), len(named_rows) - len(live_named_rows))
+    placeholder_rows = ppv_rows + always_on_rows + named_rows
     with tempfile.TemporaryDirectory() as temp:
         temp_dir = Path(temp)
         feeds: list[Feed] = []
@@ -703,6 +709,8 @@ def build() -> dict:
             "provider_fallback_programmes": sum(provider_counts.get(k, 0) for k in provider_fallback_ids),
             "ppv_name_source": "live_xtream" if xtream_url else "static_export",
             "always_on_placeholder_channels": len(always_on_rows),
+            "named_category_placeholder_channels": len(named_rows),
+            "named_category_live_channels": len(live_named_rows),
             "match_statistics": dict(metrics),
             "limitations": "Missing or conflicting tvg-id in the provider playlist can require manual TiviMate assignment. Programmes depend on the upstream providers.",
         }
@@ -713,6 +721,7 @@ def build() -> dict:
             output_path=OUT_DIR / "dashboard.json",
             ppv_rows=ppv_rows,
             always_on_rows=always_on_rows,
+            named_rows=named_rows,
             by_id=by_id, by_name=by_name, aliases=aliases, feeds=feeds,
             clean_name=clean_name, market_of=market_of, best=best, id_valid=id_valid,
             live_ppv=bool(xtream_url),
