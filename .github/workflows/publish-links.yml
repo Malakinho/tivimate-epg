@@ -39,6 +39,10 @@ jobs:
         uses: actions/upload-pages-artifact@v3
         with:
           path: ./site
+      # GitHub may index newly uploaded Pages artifacts asynchronously.
+      # The previous immediate deploy failed with 'Found 0 artifact(s)'.
+      - name: Auf Verfügbarkeit des Pages-Artefakts warten
+        run: sleep 30
       - name: Live schalten
         id: deployment
         uses: actions/deploy-pages@v4
