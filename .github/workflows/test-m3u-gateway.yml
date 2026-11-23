@@ -1,0 +1,24 @@
+name: Privates M3U-Gateway testen
+
+on:
+  push:
+    paths:
+      - 'm3u_gateway/**'
+      - '.github/workflows/test-m3u-gateway.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Node-Syntax pruefen
+        run: node --check m3u_gateway/src/index.mjs
+      - name: M3U-Sicherheit und EPG-Zuordnung testen
+        run: node --test m3u_gateway/test.mjs
