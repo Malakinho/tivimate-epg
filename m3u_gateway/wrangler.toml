@@ -1,0 +1,10 @@
+name = "private-epg-m3u"
+main = "src/index.mjs"
+compatibility_date = "2026-11-23"
+workers_dev = true
+
+[vars]
+DASHBOARD_URL = "https://malakinho.github.io/tivimate-epg/dashboard.json"
+
+# Put private values in Cloudflare Worker secrets, NEVER in this file:
+# UPSTREAM_M3U_URL, EPG_URL, ACCESS_TOKEN
