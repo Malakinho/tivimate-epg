@@ -5,7 +5,7 @@ from pathlib import Path
 
 from types import SimpleNamespace
 
-from build import clean_name, feed_normalized_names, best
+from build import clean_name, feed_normalized_names, best, excluded_us_row, SOURCES
 
 
 class EpgNameNormalizationTests(unittest.TestCase):
@@ -60,6 +60,31 @@ class EpgNameNormalizationTests(unittest.TestCase):
         self.assertIs(best([gr, de], "GR", feeds), gr)
         self.assertIs(best([gr, de], "DE", feeds), de)
         self.assertNotIn("COSMOTE SPORT 1", de.norm_names)
+
+    def test_us_exclusion_covers_static_live_and_ambiguous_platforms(self):
+        for row in (
+            {"name": "US: ABC HD"},
+            {"name": "US (ESPN+ 001) | Event"},
+            {"name": "(US) (BTN+ 001) | Event"},
+            {"name": "LIVE | Event | US: DAZN PPV 1"},
+            {"name": "PRIME: 20/20 RAW", "category_id": "1689"},
+            {"name": "NBA Team 1", "category_id": "1016"},
+            {"name": "RK: Channel", "category_id": "1888"},
+            {"name": "Event", "category": "USA | SPORTS"},
+            {"name": "Event", "region": "US"},
+        ):
+            self.assertTrue(excluded_us_row(row), row)
+        for row in (
+            {"name": "PRIME: ZDF RAW", "category_id": "1339"},
+            {"name": "JOYN: ZDF RAW", "category_id": "1357"},
+            {"name": "DE: MAGENTA SPORT 1"},
+            {"name": "GR: MAGENTA SPORT 1"},
+            {"name": "DE: US SPORTS HD"},
+            {"name": "AU (STAN 01) | Event", "category_id": "1983"},
+            {"name": "UK: SKY SPORT 1", "category_id": "2032"},
+        ):
+            self.assertFalse(excluded_us_row(row), row)
+        self.assertFalse(any(market == "US" for _, market, _ in SOURCES))
 
     def test_real_inventory_contains_the_identical_programme_channels(self):
         root = Path(__file__).resolve().parent
