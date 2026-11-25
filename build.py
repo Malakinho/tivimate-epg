@@ -223,6 +223,41 @@ def open_xml(path: Path):
     return path.open("rb")
 
 
+def greek_rebrand_names(normalized: str) -> set[str]:
+    """Only equivalent Greek linear channels; never merge Sport with League."""
+    match = re.fullmatch(
+        r"(?:MAGENTA|COSMOTE) SPORTS? (?:LEAGUE ([1-4])|([1-9])(?: (LEAGUE|L))?|HIGHLIGHTS?)",
+        normalized,
+    )
+    if match:
+        lead_league, number, suffix = match.groups()
+        league = lead_league or (number if suffix else None)
+        if league and int(league) > 4:
+            return set()
+        if league:
+            endings = (f"LEAGUE {league}", f"{league} LEAGUE", f"{league} L")
+        elif number:
+            endings = (number,)
+        else:
+            endings = ("HIGHLIGHT", "HIGHLIGHTS")
+        return {f"{brand} {sport} {ending}"
+                for brand in ("MAGENTA", "COSMOTE")
+                for sport in ("SPORT", "SPORTS") for ending in endings}
+    match = re.fullmatch(r"(?:MAGENTA|COSMOTE) (CINEMA [1-3]|SERIES|HISTORY)", normalized)
+    if match:
+        return {f"{brand} {match.group(1)}" for brand in ("MAGENTA", "COSMOTE")}
+    return set()
+
+
+def feed_normalized_names(names, market: str) -> frozenset[str]:
+    keys = {clean_name(name) for name in names}
+    keys.discard("")
+    if market == "GR":
+        for key in tuple(keys):
+            keys.update(greek_rebrand_names(key))
+    return frozenset(keys)
+
+
 def inspect_feed(feed: Feed, idx: int) -> dict[str, Channel]:
     channels: dict[str, Channel] = {}
     counts: Counter[str] = Counter()
@@ -238,7 +273,7 @@ def inspect_feed(feed: Feed, idx: int) -> dict[str, Channel]:
                     names = tuple((n.text or "").strip() for n in elem.findall("display-name") if (n.text or "").strip())
                     if xml_id and names:
                         channels[xml_id] = Channel(idx, xml_id, copy.deepcopy(elem), names,
-                                                   frozenset(filter(None, (clean_name(n) for n in names))))
+                                                   feed_normalized_names(names, feed.market))
                 elif elem.tag == "programme":
                     cid = elem.get("channel", "")
                     if cid:
@@ -260,6 +295,12 @@ def winner_score(channel: Channel, feeds: list[Feed]) -> tuple[int, int]:
 
 
 def best(candidates: list[Channel], market: str, feeds: list[Feed], provider_id: str = "") -> Channel | None:
+    # The Greek COSMOTE/MAGENTA rebrand is market-specific. Do not let
+    # synthetic Greek name keys match an ordinary German Magenta service.
+    candidates = [c for c in candidates
+                  if feeds[c.feed].market == market
+                  or not any(greek_rebrand_names(n) for n in c.norm_names)
+                  or (market != "GR" and feeds[c.feed].market != "GR")]
     if not candidates:
         return None
     result = sorted(candidates, key=lambda c: (
@@ -552,6 +593,7 @@ def build() -> dict:
                 logging.info("SPORT-PROBE %s: %s examples=%s", feeds[next(iter(feed_channels.values())).feed].label, len(matches), matches[:28])
         aliases: dict[str, Channel] = {}
         display_aliases: dict[str, set[str]] = defaultdict(set)
+        canonical_display_aliases: dict[str, set[str]] = defaultdict(set)
         candidate_ids: defaultdict[str, set[str]] = defaultdict(set)
         metrics = Counter()
         for row in input_rows:
@@ -562,6 +604,9 @@ def build() -> dict:
                 continue
             market = market_of(label)
             direct = by_id.get(user_id.casefold()) if id_valid(user_id) else None
+            if (direct and market == "GR" and greek_rebrand_names(normalized)
+                    and feeds[direct.feed].market != "GR"):
+                direct = None
             exact_candidates = by_name.get(normalized, [])
             compact_candidates = matching_candidates(normalized, by_name, by_compact)
             named = best(compact_candidates, market, feeds, user_id)
@@ -612,6 +657,14 @@ def build() -> dict:
                 if user_id.casefold() in by_id:
                     if user_id.casefold() != chosen.id.casefold():
                         metrics["id_conflict_requires_playlist_fix"] += 1
+                    elif (named is not None and direct is not None
+                          and feeds[chosen.feed].market == market
+                          and label not in chosen.names
+                          and label not in canonical_display_aliases[chosen.id]):
+                        # Preserve the canonical ID and original first display-name.
+                        # Exact playlist titles offer additional name-based matching.
+                        canonical_display_aliases[chosen.id].add(label)
+                        metrics["canonical_playlist_display_names_added"] += 1
                     continue
                 alias_id = user_id
                 # If provider uses one ID for two different real channels, refuse both.
@@ -697,7 +750,15 @@ def build() -> dict:
                 zipout.write(b'<?xml version="1.0" encoding="UTF-8"?>\n')
                 zipout.write(b'<tv generator-info-name="DE-GR-TiviMate-Custom-EPG">\n')
                 for ch in sorted(by_id.values(), key=lambda c: c.id.casefold()):
-                    zipout.write(ET.tostring(ch.element, encoding="utf-8"))
+                    element = copy.deepcopy(ch.element)
+                    # XMLTV requires display-name before icon/url. Insert after
+                    # existing display names while retaining the original order.
+                    names_end = sum(child.tag == "display-name" for child in element)
+                    for offset, label in enumerate(sorted(canonical_display_aliases.get(ch.id, ()))):
+                        node = ET.Element("display-name")
+                        node.text = label
+                        element.insert(names_end + offset, node)
+                    zipout.write(ET.tostring(element, encoding="utf-8"))
                     zipout.write(b"\n")
                 for alias, ch in sorted(aliases.items()):
                     elt = ET.Element("channel", {"id": alias})
@@ -846,6 +907,29 @@ def build() -> dict:
         )
         result["dashboard_channels"] = dashboard["total"]
         result["dashboard_counts"] = dashboard["counts"]
+        # Informational only: distinguish exact tvg-id matches from name-based
+        # matches; neither guarantees how any particular app will assign a guide.
+        alignment = {}
+        for name, category, category_id, provider_id, xmltv_id, status, region, kind, claimable in dashboard["rows"]:
+            if region not in ("DE", "GR") or kind != "Sender":
+                continue
+            summary = alignment.setdefault(region, Counter())
+            summary["ordinary_channels"] += 1
+            if status == "programm":
+                summary["real_programme_channels"] += 1
+                if id_valid(provider_id) and provider_id == xmltv_id:
+                    summary["exact_reported_id_matches"] += 1
+                elif id_valid(provider_id) and provider_id.casefold() == xmltv_id.casefold():
+                    summary["case_insensitive_reported_id_matches"] += 1
+                elif not id_valid(provider_id):
+                    summary["real_programme_no_provider_id"] += 1
+                else:
+                    summary["real_programme_different_id"] += 1
+            elif status == "ohne":
+                summary["without_programmes"] += 1
+            elif status == "pruefen":
+                summary["requires_review"] += 1
+        result["de_gr_assignment_diagnostics"] = {k: dict(v) for k, v in alignment.items()}
         shutil.copyfile(ROOT / "dashboard" / "index.html", OUT_DIR / "index.html")
         shutil.copyfile(ROOT / "dashboard" / "m3u.html", OUT_DIR / "m3u.html")
         shutil.copyfile(ROOT / "dashboard" / "diagnostics.js", OUT_DIR / "diagnostics.js")
