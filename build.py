@@ -910,6 +910,10 @@ def build() -> dict:
         # Informational only: distinguish exact tvg-id matches from name-based
         # matches; neither guarantees how any particular app will assign a guide.
         alignment = {}
+        published_ids = ({ch.id for ch in by_id.values()} | set(aliases)
+                         | set(provider_fallback_ids.values())
+                         | {item["id"] for item in placeholder_rows})
+        published_folded_ids = {value.casefold() for value in published_ids}
         for name, category, category_id, provider_id, xmltv_id, status, region, kind, claimable in dashboard["rows"]:
             if region not in ("DE", "GR") or kind != "Sender":
                 continue
@@ -917,10 +921,12 @@ def build() -> dict:
             summary["ordinary_channels"] += 1
             if status == "programm":
                 summary["real_programme_channels"] += 1
-                if id_valid(provider_id) and provider_id == xmltv_id:
-                    summary["exact_reported_id_matches"] += 1
-                elif id_valid(provider_id) and provider_id.casefold() == xmltv_id.casefold():
-                    summary["case_insensitive_reported_id_matches"] += 1
+                if (id_valid(provider_id) and provider_id.casefold() == xmltv_id.casefold()
+                        and provider_id in published_ids):
+                    summary["exact_published_id_matches"] += 1
+                elif (id_valid(provider_id) and provider_id.casefold() == xmltv_id.casefold()
+                      and provider_id.casefold() in published_folded_ids):
+                    summary["case_insensitive_published_id_matches"] += 1
                 elif not id_valid(provider_id):
                     summary["real_programme_no_provider_id"] += 1
                 else:
