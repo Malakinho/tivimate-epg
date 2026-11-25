@@ -7,6 +7,8 @@ on:
   push:
     paths:
       - 'build.py'
+      - 'audit_de_gr.py'
+      - 'test_audit_de_gr.py'
       - 'xtream_ppv.py'
       - 'named_categories.py'
       - 'name_matching.py'
@@ -51,9 +53,9 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: PPV-Erkennung für USA und Deutschland testen
+      - name: EPG-Zuordnungen und Filter testen
         run: |
-          python -m unittest -v test_ppv_categories.py test_always_on_categories.py test_named_categories.py test_name_normalization.py test_general_name_matching.py test_placeholder_renaming.py test_real_epg_priority.py test_diagnostics.py
+          python -m unittest -v test_ppv_categories.py test_always_on_categories.py test_named_categories.py test_name_normalization.py test_general_name_matching.py test_placeholder_renaming.py test_real_epg_priority.py test_diagnostics.py test_audit_de_gr.py
           node --check dashboard/diagnostics.js
       - name: XMLTV aus DE und GR erzeugen
         env:
@@ -72,3 +74,18 @@ jobs:
       - name: Live schalten
         id: deployment
         uses: actions/deploy-pages@v4
+      # Audit runs only for code changes/manual runs, never every scheduled update.
+      # New source programme data is not merged into or served by Pages.
+      - name: Zusätzliche DE-GR EPG-Quellen vergleichen
+        if: ${{ github.event_name != 'schedule' }}
+        continue-on-error: true
+        timeout-minutes: 4
+        run: python audit_de_gr.py site/dashboard.json audit-results/coverage.json
+      - name: Quellenvergleich als Bericht sichern
+        if: ${{ github.event_name != 'schedule' && hashFiles('audit-results/coverage.json') != '' }}
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: de-gr-coverage-audit
+          path: audit-results/coverage.json
+          retention-days: 7
