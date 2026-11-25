@@ -62,11 +62,10 @@ SOURCES = [
     ("PL-IPTV", "PL", "https://iptv-epg.org/files/epg-pl.xml.gz"),
     ("HR-IPTV", "HR", "https://iptv-epg.org/files/epg-hr.xml.gz"),
     ("NL-IPTV", "NL", "https://iptv-epg.org/files/epg-nl.xml.gz"),
-    ("US-IPTV", "US", "https://iptv-epg.org/files/epg-us.xml.gz"),
 ]
 EXTRA_FEED_LABELS = {"DE-FREEEPG", "GR-FREEEPG", "DE-XMLTVLIVE", "GR-XMLTVLIVE",
-                     "FR-IPTV", "IT-IPTV", "PL-IPTV", "HR-IPTV", "NL-IPTV", "US-IPTV"}
-SELECTIVE_COUNTRY_FEEDS = {"FR-IPTV", "IT-IPTV", "PL-IPTV", "HR-IPTV", "NL-IPTV", "US-IPTV"}
+                     "FR-IPTV", "IT-IPTV", "PL-IPTV", "HR-IPTV", "NL-IPTV"}
+SELECTIVE_COUNTRY_FEEDS = {"FR-IPTV", "IT-IPTV", "PL-IPTV", "HR-IPTV", "NL-IPTV"}
 # These are design hints only. Do not infer the actual licence for TV metadata.
 MAX_DOWNLOAD = 180 * 1024 * 1024
 BAD_IDS = {"", "TS", "N/A", "NONE", "NULL", "0", "-"}
@@ -158,6 +157,32 @@ def clean_name(value: str) -> str:
     value = re.sub(r"^NOVASPORTS (START|PREMIER LEAGUE) SAT$", r"NOVASPORTS \1", value)
     value = re.sub(r"^CRIME\s*\+\s*INVESTIGATION$", "CRIME INVESTIGATION", value)
     return value
+
+
+# IDs of categories in the provider's US section of the stored inventory.
+# Keep Australian STAN (1983), shared international category 2032 and
+# the separate German PRIME (1339) / German streaming categories.
+US_CATEGORY_IDS = frozenset("""
+58 490 491 492 493 573 597 598 599 600 601 602 603 604 605 606 607
+612 613 619 688 903 911 925 927 931 960 961 1014 1016 1021 1033
+1038 1056 1109 1110 1112 1139 1151 1185 1192 1206 1243 1257 1383 1387
+1393 1394 1497 1501 1503 1513 1591 1648 1689 1882 1884 1885 1886 1888
+1926 1927 1928 1940 1960 1992 1996 2014 2017 2036 2041 2049 2056 2057
+2058 2059 2060 2061 2062 2063 2064 2094 2096 2196 2213 2214 2222
+2253 2301 2302 2303 2304
+""".split())
+US_NAME = re.compile(r"(?:^|\|\s*)(?:(?:US|USA)\s*[:(]|\((?:US|USA)\))", re.I)
+US_CATEGORY_NAME = re.compile(r"(?:^|[\s#|])(?:US|USA|UNITED STATES)(?=$|[\s:#|(/-])", re.I)
+
+
+def excluded_us_row(row: dict) -> bool:
+    name = unicodedata.normalize("NFKC", str(row.get("name") or "").strip())
+    category = unicodedata.normalize("NFKC", str(row.get("category") or "").strip())
+    return (str(row.get("category_id") or "").strip() in US_CATEGORY_IDS
+            or str(row.get("region") or "").upper() == "US"
+            or bool(US_NAME.search(name))
+            or bool(US_CATEGORY_NAME.search(category))
+            or (name.startswith("##") and bool(US_CATEGORY_NAME.search(name))))
 
 
 def market_of(name: str) -> str:
@@ -364,8 +389,7 @@ def publish_personal_guides(master: Path) -> int:
 def selected_country_names() -> dict[str, set[str]]:
     """Target only ordinary playlist channels, never PPV or 24/7 catalogues.
 
-    Particularly for US, downloading the whole EPG is useful for coverage but
-    copying *every* provider programme would make each friend file huge.
+    Copying every provider programme would make each friend file huge.
     """
     inv_path = ROOT / "data" / "inventory.csv"
     with inv_path.open("r", encoding="utf-8-sig", newline="") as file:
@@ -382,7 +406,7 @@ def selected_country_names() -> dict[str, set[str]]:
         if not title or title.startswith("##"):
             continue
         market = market_of(title)
-        if market not in {"FR", "IT", "PL", "HR", "NL", "US"}:
+        if market not in {"FR", "IT", "PL", "HR", "NL"}:
             continue
         category = headings.get((row.get("category_id") or "").strip(), "")
         if re.search(r"\bPPV\b|(?<!\d)24\s*[/\-]\s*7(?!\d)", title + " " + category, re.I):
@@ -439,6 +463,15 @@ def build() -> dict:
         input_rows = list(csv.DictReader(csvfile))
     with (ROOT / "data" / "inventory.csv").open("r", encoding="utf-8-sig", newline="") as csvfile:
         full_inventory = list(csv.DictReader(csvfile))
+    original_inventory = full_inventory
+    full_inventory = [row for row in original_inventory if not excluded_us_row(row)]
+    def row_key(row):
+        return (str(row.get("name") or "").strip(), str(row.get("epg_channel_id") or "").strip())
+    retained_keys = {row_key(row) for row in full_inventory}
+    removed_keys = {row_key(row) for row in original_inventory if excluded_us_row(row)} - retained_keys
+    input_rows = [row for row in input_rows if not excluded_us_row(row) and row_key(row) not in removed_keys]
+    removed_inventory_count = sum(not str(row.get("name") or "").startswith("##")
+                                  for row in original_inventory if excluded_us_row(row))
     named_ids = named_category_ids(full_inventory)
     # Whole 24/7 categories are followed by stream ID, even when individual
     # stream names do not contain 24/7 (e.g. COSMOTE FILM 1).
@@ -450,12 +483,12 @@ def build() -> dict:
     }
     xtream_url = os.environ.get("XTREAM_M3U_URL", "").strip()
     with PPV_DATA.open("r", encoding="utf-8-sig", newline="") as csvfile:
-        static_ppv_rows = list(csv.DictReader(csvfile))
+        static_ppv_rows = [row for row in csv.DictReader(csvfile) if not excluded_us_row(row)]
     # Static CSV data is a fallback if no authenticated live provider exists.
     # Once live Xtream data is available, never publish stale CSV titles as
     # if they were current sender names.
     with ALWAYS_ON_DATA.open("r", encoding="utf-8-sig", newline="") as csvfile:
-        always_on_static = extend_always_on_categories(list(csv.DictReader(csvfile)),
+        always_on_static = extend_always_on_categories([row for row in csv.DictReader(csvfile) if not excluded_us_row(row)],
                                                        full_inventory)
     previous_bindings, previous_aliases = {}, {}
     if xtream_url:
@@ -484,6 +517,9 @@ def build() -> dict:
         # Prefer current stream names. Retain old static placeholders only
         # for whole categories missing from the live API so previously
         # published EPG entries do not suddenly vanish.
+        ppv_rows = [row for row in ppv_rows if not excluded_us_row(row)]
+        live_named_rows = [row for row in live_named_rows if not excluded_us_row(row)]
+        live_always_rows = [row for row in live_always_rows if not excluded_us_row(row)]
         live_named_categories = {r["category_id"] for r in live_named_rows}
         live_always_categories = {r["category_id"] for r in live_always_rows}
         published_always_ids = {r["id"] for r in live_always_rows}
@@ -506,8 +542,17 @@ def build() -> dict:
         named_rows = static_named_rows(full_inventory, named_ids)
         logging.info("Static fallback: no XTREAM_M3U_URL configured")
     placeholder_rows = ppv_rows + always_on_rows + named_rows
+    retained_provider_ids = {str(row.get("epg_channel_id") or "").strip().casefold()
+                             for row in full_inventory + input_rows + placeholder_rows
+                             if id_valid(str(row.get("epg_channel_id") or ""))}
     with tempfile.TemporaryDirectory() as temp:
         temp_dir = Path(temp)
+        # Both dashboard and XMLTV use the same filtered inventory.
+        filtered_inventory_path = temp_dir / "inventory-filtered.csv"
+        with filtered_inventory_path.open("w", encoding="utf-8", newline="") as handle:
+            writer = csv.DictWriter(handle, fieldnames=["name", "epg_channel_id", "category_id"], extrasaction="ignore")
+            writer.writeheader()
+            writer.writerows(full_inventory)
         feeds: list[Feed] = []
         source_report = begin_source_report(SOURCES)
         for name, market, url in SOURCES:
@@ -564,6 +609,9 @@ def build() -> dict:
         for feed_channels in per_feed:
             for ch in feed_channels.values():
                 if ch.programmes <= 0:
+                    continue
+                if (ch.id.casefold().endswith((".us", ".usa"))
+                        and ch.id.casefold() not in retained_provider_ids):
                     continue
                 if feeds[ch.feed].label in SELECTIVE_COUNTRY_FEEDS and ch.id not in allowed_ids_by_feed[feeds[ch.feed].label]:
                     continue
@@ -694,8 +742,7 @@ def build() -> dict:
 
         # Only fallback for valid playlist EPG IDs that are not yet served
         # by a real, selected public programme source. Do not overwrite.
-        with (ROOT / "data" / "inventory.csv").open("r", encoding="utf-8-sig", newline="") as inv:
-            provider_ids = {row.get("epg_channel_id", "").strip() for row in csv.DictReader(inv)}
+        provider_ids = {row.get("epg_channel_id", "").strip() for row in full_inventory}
         covered_ids = set(by_id) | {aid.casefold() for aid in aliases}
         # Some live streams have guide IDs missing from old inventory snapshots.
         provider_ids.update(str(item.get("epg_channel_id") or "").strip()
@@ -890,7 +937,7 @@ def build() -> dict:
         with (ROOT / "data" / "manual_approvals.json").open("r", encoding="utf-8") as approval_file:
             manual_approvals = json.load(approval_file).get("approved", [])
         dashboard = make_dashboard(
-            inventory_path=ROOT / "data" / "inventory.csv",
+            inventory_path=filtered_inventory_path,
             output_path=OUT_DIR / "dashboard.json",
             ppv_rows=ppv_rows,
             always_on_rows=always_on_rows,
@@ -905,6 +952,11 @@ def build() -> dict:
             real_placeholder_ids=real_placeholder_ids,
             manual_approvals=manual_approvals,
         )
+        if any(excluded_us_row({"name": row[0], "category": row[1], "category_id": row[2], "region": row[6]})
+               for row in dashboard["rows"]):
+            raise RuntimeError("US channel exclusion verification failed")
+        result["excluded_us_inventory_channels"] = removed_inventory_count
+        result["dashboard_us_channels"] = 0
         result["dashboard_channels"] = dashboard["total"]
         result["dashboard_counts"] = dashboard["counts"]
         # Informational only: distinguish exact tvg-id matches from name-based
